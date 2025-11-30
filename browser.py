@@ -9,64 +9,205 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
 
 class BrowserTab(QWidget):
-    def __init__(self, url="https://www.google.com"):
-        super().__init__()
-        self.layout = QVBoxLayout()
-        self.webview = QWebEngineView()
-        self.webview.setUrl(QUrl(url))
-        self.layout.addWidget(self.webview)
-        self.setLayout(self.layout)
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        # specific profile setup can be done here, using default for now
+        self.profile = QWebEngineProfile.defaultProfile()
+        self.page = QWebEnginePage(self.profile)
+        self.view = QWebEngineView()
+        self.view.setPage(self.page)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.view)
 
-class BrowserMainWindow(QMainWindow):
+        # Connect signals for URL and Title changes
+        self.view.urlChanged.connect(self.on_url_changed)
+        self.view.titleChanged.connect(self.on_title_changed)
+        self.view.loadFinished.connect(self.on_load_finished)
+
+    def on_url_changed(self, qurl: QUrl):
+        # Notify the main window to update the URL bar
+        parent = self.parent()
+        if isinstance(parent, QTabWidget):
+            mw = parent.parent()
+            if isinstance(mw, MainWindow):
+                mw.url_bar.setText(qurl.toString())
+
+    def on_title_changed(self, title: str):
+        # Update the tab text
+        parent = self.parent()
+        if isinstance(parent, QTabWidget):
+            idx = parent.indexOf(self)
+            if idx >= 0:
+                parent.setTabText(idx, title[:20] + "..." if len(title) > 20 else title)
+
+    def on_load_finished(self, ok: bool):
+        # Update status bar via Main Window
+        parent = self.parent()
+        if isinstance(parent, QTabWidget):
+            mw = parent.parent()
+            if isinstance(mw, MainWindow):
+                if ok:
+                    mw.status.showMessage(f"Loaded: {self.view.title()}")
+                else:
+                    mw.status.showMessage("Failed to load page")
+
+class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PyQt6 Browser")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setWindowTitle("Simple Python Browser")
+        self.resize(1200, 800)
 
-        self.tabs = QTabWidget()
+        # Tab Widget
+        self.tabs = QTabWidget(movable=True, tabsClosable=True)
+        self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.tabs.currentChanged.connect(self.tab_changed)
         self.setCentralWidget(self.tabs)
 
-        self.toolbar = QToolBar()
-        self.addToolBar(self.toolbar)
-
+        # URL Bar
         self.url_bar = QLineEdit()
-        self.url_bar.returnPressed.connect(self.load_url)
-        self.toolbar.addWidget(self.url_bar)
+        self.url_bar.setPlaceholderText("Enter URL and press Enter...")
+        self.url_bar.returnPressed.connect(self.navigate_to_url)
 
-        new_tab_action = QAction(QIcon(), "New Tab", self)
-        new_tab_action.triggered.connect(self.add_new_tab)
-        self.toolbar.addAction(new_tab_action)
+        # Zoom Controls
+        self.zoom_combo = QComboBox()
+        self.zoom_combo.addItems(["50%", "75%", "100%", "125%", "150%", "200%"])
+        self.zoom_combo.setCurrentText("100%")
+        self.zoom_combo.currentTextChanged.connect(self.on_zoom_changed)
 
-        self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar)
+        # Setup UI Components
+        self.setup_toolbar()
+        self.setup_menu()
+        
+        self.status = QStatusBar()
+        self.setStatusBar(self.status)
 
-        self.add_new_tab()
+        # Open initial tab
+        self.add_tab()
+        self.navigate_home()
 
-    def add_new_tab(self, url="https://www.google.com"):
-        new_tab = BrowserTab(url)
-        index = self.tabs.addTab(new_tab, "New Tab")
-        self.tabs.setCurrentIndex(index)
-        new_tab.webview.urlChanged.connect(lambda qurl, tab=new_tab: self.update_url_bar(qurl, tab))
-        new_tab.webview.loadFinished.connect(lambda _, tab=new_tab: self.update_tab_title(tab))
+    def setup_toolbar(self):
+        toolbar = QToolBar("Navigation")
+        toolbar.setIconSize(QSize(16, 16))
+        self.addToolBar(toolbar)
 
-    def load_url(self):
-        current_tab = self.tabs.currentWidget()
-        url = self.url_bar.text()
-        if not url.startswith("http"):
-            url = "http://" + url
-        current_tab.webview.setUrl(QUrl(url))
+        # Back
+        back_action = QAction("Back", self)
+        back_action.triggered.connect(lambda: self.current_view().back())
+        toolbar.addAction(back_action)
 
-    def update_url_bar(self, qurl, tab):
-        if tab == self.tabs.currentWidget():
-            self.url_bar.setText(qurl.toString())
+        # Forward
+        forward_action = QAction("Forward", self)
+        forward_action.triggered.connect(lambda: self.current_view().forward())
+        toolbar.addAction(forward_action)
 
-    def update_tab_title(self, tab):
-        index = self.tabs.indexOf(tab)
-        title = tab.webview.title()
-        self.tabs.setTabText(index, title)
-    
-if __name__ == "__main__":
+        # Reload
+        reload_action = QAction("Reload", self)
+        reload_action.triggered.connect(lambda: self.current_view().reload())
+        toolbar.addAction(reload_action)
+
+        # Home
+        home_action = QAction("Home", self)
+        home_action.triggered.connect(self.navigate_home)
+        toolbar.addAction(home_action)
+
+        # URL Bar
+        toolbar.addWidget(self.url_bar)
+
+        # Zoom
+        toolbar.addWidget(self.zoom_combo)
+
+        # New Tab
+        new_tab_action = QAction("+", self)
+        new_tab_action.triggered.connect(self.add_tab)
+        toolbar.addAction(new_tab_action)
+
+    def setup_menu(self):
+        menubar = self.menuBar()
+        
+        # File Menu
+        file_menu = menubar.addMenu("&File")
+        
+        new_tab_act = QAction("New Tab", self)
+        new_tab_act.setShortcut("Ctrl+T")
+        new_tab_act.triggered.connect(self.add_tab)
+        file_menu.addAction(new_tab_act)
+
+        close_tab_act = QAction("Close Tab", self)
+        close_tab_act.setShortcut("Ctrl+W")
+        close_tab_act.triggered.connect(lambda: self.close_tab(self.tabs.currentIndex()))
+        file_menu.addAction(close_tab_act)
+
+        exit_act = QAction("Exit", self)
+        exit_act.setShortcut("Ctrl+Q")
+        exit_act.triggered.connect(self.close)
+        file_menu.addAction(exit_act)
+
+    def current_tab(self) -> BrowserTab:
+        return self.tabs.currentWidget()
+
+    def current_view(self) -> QWebEngineView:
+        if self.current_tab():
+            return self.current_tab().view
+        return None
+
+    def add_tab(self):
+        tab = BrowserTab(self)
+        idx = self.tabs.addTab(tab, "New Tab")
+        self.tabs.setCurrentIndex(idx)
+        self.url_bar.setFocus()
+
+    def close_tab(self, index: int):
+        if self.tabs.count() > 1:
+            self.tabs.removeTab(index)
+        else:
+            self.close() # Close window if last tab is closed
+
+    def tab_changed(self, index):
+        if self.current_view():
+            url = self.current_view().url().toString()
+            self.url_bar.setText(url)
+
+    def navigate_home(self):
+        if self.current_view():
+            self.current_view().setUrl(QUrl("https://www.google.com"))
+
+    def navigate_to_url(self):
+        if not self.current_view():
+            return
+            
+        url_text = self.url_bar.text().strip()
+        if not url_text:
+            return
+
+        # Simple sanitization
+        if "." not in url_text:
+            # Treat as search query if no dot (very basic)
+            url_text = f"https://www.google.com/search?q={url_text}"
+        elif not url_text.startswith("http://") and not url_text.startswith("https://"):
+            url_text = "https://" + url_text
+
+        self.current_view().setUrl(QUrl(url_text))
+
+    def on_zoom_changed(self, text: str):
+        if not self.current_view():
+            return
+        try:
+            value = int(text.strip('%')) / 100.0
+            self.current_view().setZoomFactor(value)
+        except ValueError:
+            pass
+
+def main():
     app = QApplication(sys.argv)
-    window = BrowserMainWindow()
+    app.setApplicationName("SimpleBrowser")
+    
+    window = MainWindow()
     window.show()
+    
     sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()
