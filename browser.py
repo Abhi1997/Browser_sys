@@ -6,18 +6,26 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtCore import QUrl, QSize, Qt
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QLineEdit,
+    QTabWidget, QToolBar, QStatusBar, QComboBox
+)
+from PyQt6.QtGui import QAction
+from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
+
 
 class BrowserTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        
+
         # specific profile setup can be done here, using default for now
         self.profile = QWebEngineProfile.defaultProfile()
         self.page = QWebEnginePage(self.profile)
         self.view = QWebEngineView()
         self.view.setPage(self.page)
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.view)
@@ -32,7 +40,11 @@ class BrowserTab(QWidget):
         parent = self.parent()
         if isinstance(parent, QTabWidget):
             mw = parent.parent()
-            if isinstance(mw, MainWindow):
+            try:
+                from browser import MainWindow  # local import to avoid forward reference
+            except Exception:
+                MainWindow = None
+            if MainWindow and isinstance(mw, MainWindow):
                 mw.url_bar.setText(qurl.toString())
 
     def on_title_changed(self, title: str):
@@ -48,11 +60,16 @@ class BrowserTab(QWidget):
         parent = self.parent()
         if isinstance(parent, QTabWidget):
             mw = parent.parent()
-            if isinstance(mw, MainWindow):
+            try:
+                from browser import MainWindow
+            except Exception:
+                MainWindow = None
+            if MainWindow and isinstance(mw, MainWindow):
                 if ok:
                     mw.status.showMessage(f"Loaded: {self.view.title()}")
                 else:
                     mw.status.showMessage("Failed to load page")
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -80,7 +97,7 @@ class MainWindow(QMainWindow):
         # Setup UI Components
         self.setup_toolbar()
         self.setup_menu()
-        
+
         self.status = QStatusBar()
         self.setStatusBar(self.status)
 
@@ -126,10 +143,10 @@ class MainWindow(QMainWindow):
 
     def setup_menu(self):
         menubar = self.menuBar()
-        
+
         # File Menu
         file_menu = menubar.addMenu("&File")
-        
+
         new_tab_act = QAction("New Tab", self)
         new_tab_act.setShortcut("Ctrl+T")
         new_tab_act.triggered.connect(self.add_tab)
@@ -163,7 +180,7 @@ class MainWindow(QMainWindow):
         if self.tabs.count() > 1:
             self.tabs.removeTab(index)
         else:
-            self.close() # Close window if last tab is closed
+            self.close()  # Close window if last tab is closed
 
     def tab_changed(self, index):
         if self.current_view():
@@ -177,7 +194,7 @@ class MainWindow(QMainWindow):
     def navigate_to_url(self):
         if not self.current_view():
             return
-            
+
         url_text = self.url_bar.text().strip()
         if not url_text:
             return
@@ -199,15 +216,3 @@ class MainWindow(QMainWindow):
             self.current_view().setZoomFactor(value)
         except ValueError:
             pass
-
-def main():
-    app = QApplication(sys.argv)
-    app.setApplicationName("SimpleBrowser")
-    
-    window = MainWindow()
-    window.show()
-    
-    sys.exit(app.exec())
-
-if __name__ == "__main__":
-    main()
