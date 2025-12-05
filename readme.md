@@ -385,4 +385,4 @@ For issues, questions, or suggestions, please open an issue on the project repos
 
 **Last Updated**: 2025-12-05  
 **Maintainer**: Abhinav Paudel  
-**Status**: Active Development
+**Status**: Under Development
