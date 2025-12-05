@@ -2,23 +2,26 @@ import sys
 from PyQt6.QtCore import QUrl, QSize, Qt
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QPushButton, QLineEdit, 
-    QTabWidget, QApplication, QToolBar, QStatusBar, QComboBox, QMessageBox
+    QTabWidget, QApplication, QToolBar, QStatusBar, QComboBox, QMessageBox,QDialog
 )
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtCore import QUrl, QSize, Qt
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QLineEdit,
+    QMainWindow,QInputDialog, QWidget, QVBoxLayout, QLineEdit,QLabel,QLineEdit,QPushButton,QMessageBox,
     QTabWidget, QToolBar, QStatusBar, QComboBox
 )
 from PyQt6.QtGui import QAction
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
+from authentication import Authentication
 
 
 class BrowserTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+
+
 
         # specific profile setup can be done here, using default for now
         self.profile = QWebEngineProfile.defaultProfile()
@@ -71,6 +74,57 @@ class BrowserTab(QWidget):
                     mw.status.showMessage("Failed to load page")
 
 
+
+class LoginWindow(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Login")
+        self.setFixedSize(300, 150)
+
+        # Layout
+        layout = QVBoxLayout()
+
+        # Username field
+        self.username_label = QLabel("Username:")
+        self.username_input = QLineEdit()
+        layout.addWidget(self.username_label)
+        layout.addWidget(self.username_input)
+
+        # Password field
+        self.password_label = QLabel("Password:")
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(self.password_label)
+        layout.addWidget(self.password_input)
+
+        # Login button
+        self.login_button = QPushButton("Login")
+        self.login_button.clicked.connect(self.handle_login)
+        layout.addWidget(self.login_button)
+
+        self.setLayout(layout)
+
+        # Authentication instance
+        self.auth = Authentication(host="localhost", user="root", password="Innovation", database="edubrowser")
+
+        # Login status
+        self.login_successful = False
+
+    def handle_login(self):
+        username = self.username_input.text().strip()
+        password = self.password_input.text().strip()
+
+        if not username or not password:
+            QMessageBox.warning(self, "Login Failed", "Please enter both username and password.")
+            return
+
+        role = self.auth.validate_user(username, password)
+        if role:
+            QMessageBox.information(self, "Login Successful", f"Welcome, {username}! Role: {role}")
+            self.login_successful = True
+            self.close()  # Close the login window
+        else:
+            QMessageBox.warning(self, "Login Failed", "Invalid username or password. Please try again.")
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -207,7 +261,23 @@ class MainWindow(QMainWindow):
             url_text = "https://" + url_text
 
         self.current_view().setUrl(QUrl(url_text))
-
+    def prompt_login(self):
+        auth = Authentication(host="localhost", user="root", password="your_password", database="edubrowser")
+        while True:
+            username, ok = QInputDialog.getText(self, "Login", "Username:")
+            if not ok:
+                exit()  # Exit if the user cancels the login dialog
+            password, ok = QInputDialog.getText(self, "Login", "Password:", QInputDialog.Password)
+            if not ok:
+                exit()
+    
+            role = auth.validate_user(username, password)
+            if role:
+                QMessageBox.information(self, "Login Successful", f"Welcome, {username}! Role: {role}")
+                self.user_role = role  # Store the user's role
+                break
+            else:
+                QMessageBox.warning(self, "Login Failed", "Invalid username or password. Please try again.")
     def on_zoom_changed(self, text: str):
         if not self.current_view():
             return
