@@ -2,7 +2,7 @@ import sys
 from PyQt6.QtCore import QUrl, QSize, Qt
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QPushButton, QLineEdit, 
-    QTabWidget, QApplication, QToolBar, QStatusBar, QComboBox, QMessageBox,QDialog
+    QTabWidget, QApplication, QToolBar, QStatusBar, QComboBox, QMessageBox,QDialog,QStyle
 )
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWebEngineWidgets import QWebEngineView
@@ -169,26 +169,32 @@ class MainWindow(QMainWindow):
 
     def setup_toolbar(self):
         toolbar = QToolBar("Navigation")
-        toolbar.setIconSize(QSize(16, 16))
+        toolbar.setIconSize(QSize(20, 20))
         self.addToolBar(toolbar)
 
+        style = QApplication.style()
+
         # Back
-        back_action = QAction("Back", self)
-        back_action.triggered.connect(lambda: self.current_view().back())
+        back_action = QAction(style.standardIcon(QStyle.StandardPixmap.SP_ArrowBack), "", self)
+        back_action.setToolTip("Back")
+        back_action.triggered.connect(lambda: self.current_view() and self.current_view().back())
         toolbar.addAction(back_action)
 
         # Forward
-        forward_action = QAction("Forward", self)
-        forward_action.triggered.connect(lambda: self.current_view().forward())
-        toolbar.addAction(forward_action)
+        fwd_action = QAction(style.standardIcon(QStyle.StandardPixmap.SP_ArrowForward), "", self)
+        fwd_action.setToolTip("Forward")
+        fwd_action.triggered.connect(lambda: self.current_view() and self.current_view().forward())
+        toolbar.addAction(fwd_action)
 
         # Reload
-        reload_action = QAction("Reload", self)
-        reload_action.triggered.connect(lambda: self.current_view().reload())
+        reload_action = QAction(style.standardIcon(QStyle.StandardPixmap.SP_BrowserReload), "", self)
+        reload_action.setToolTip("Reload")
+        reload_action.triggered.connect(lambda: self.current_view() and self.current_view().reload())
         toolbar.addAction(reload_action)
 
         # Home
-        home_action = QAction("Home", self)
+        home_action = QAction(style.standardIcon(QStyle.StandardPixmap.SP_DirHomeIcon), "", self)
+        home_action.setToolTip("Home")
         home_action.triggered.connect(self.navigate_home)
         toolbar.addAction(home_action)
 
@@ -196,16 +202,19 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.url_bar)
 
         # Zoom
+        self.zoom_combo.setToolTip("Zoom")
         toolbar.addWidget(self.zoom_combo)
 
         # New Tab
-        new_tab_action = QAction("+", self)
+        new_tab_action = QAction(style.standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder), "", self)
+        new_tab_action.setToolTip("New Tab")
         new_tab_action.triggered.connect(self.add_tab)
         toolbar.addAction(new_tab_action)
 
-        # Dashboard button for non-student roles
+        # Dashboard (roles: admin/super-admin/teacher)
         if self.user_role in ("admin", "super-admin", "teacher"):
-            dash_action = QAction("Dashboard", self)
+            dash_action = QAction(style.standardIcon(QStyle.StandardPixmap.SP_ComputerIcon), "", self)
+            dash_action.setToolTip("Dashboard")
             dash_action.triggered.connect(self.open_dashboard)
             toolbar.addAction(dash_action)
 
