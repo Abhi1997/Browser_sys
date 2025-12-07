@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+dist/
+build/
+
+# VS Code
+.vscode/
+
+# Node/React
+react-dashboard/node_modules/
+react-dashboard/dist/
+react-dashboard/.vite/
+react-dashboard/.DS_Store
+
+# macOS
+.DS_Store
