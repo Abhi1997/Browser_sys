@@ -1,8 +1,17 @@
+import os
 import sys
+from PyQt6.QtCore import Qt, QCoreApplication
 from PyQt6.QtWidgets import QApplication
 from browser import MainWindow, LoginWindow
 
 def main():
+    # Env flags to stabilize Qt WebEngine on macOS
+    os.environ.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
+    os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu --disable-software-rasterizer --no-sandbox")
+
+    # Must be set before creating QApplication
+    QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
+
     app = QApplication(sys.argv)
 
     # Show login window
