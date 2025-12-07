@@ -15,7 +15,7 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
 from authentication import Authentication
-from admin_dashboard import AdminDashboard
+from admin_dashboard import AdminDashboard, DashboardWindow
 
 
 class BrowserTab(QWidget):
@@ -203,6 +203,12 @@ class MainWindow(QMainWindow):
         new_tab_action.triggered.connect(self.add_tab)
         toolbar.addAction(new_tab_action)
 
+        # Dashboard button for non-student roles
+        if self.user_role in ("admin", "super-admin", "teacher"):
+            dash_action = QAction("Dashboard", self)
+            dash_action.triggered.connect(self.open_dashboard)
+            toolbar.addAction(dash_action)
+
     def setup_menu(self):
         menubar = self.menuBar()
 
@@ -297,4 +303,10 @@ class MainWindow(QMainWindow):
 
     def open_admin_dashboard(self):
         dlg = AdminDashboard(self, auth=self.auth)
+        dlg.exec()
+
+    def open_dashboard(self):
+        # Point to React dev server; change to file URL of build for production
+        react_url = "http://localhost:3000"
+        dlg = DashboardWindow(self, auth=self.auth, role=self.user_role, username=self.username, react_url=react_url)
         dlg.exec()

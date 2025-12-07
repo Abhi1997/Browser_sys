@@ -1,9 +1,29 @@
 # language: python
 # admin_dashboard.py
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QPushButton, QHBoxLayout, QMessageBox
+from PyQt6.QtCore import QUrl
+from PyQt6.QtWebEngineWidgets import QWebEngineView
 import mysql.connector
 from authentication import Authentication
 from datetime import datetime
+
+class DashboardWindow(QDialog):
+    def __init__(self, parent=None, auth: Authentication | None = None, role: str | None = None, username: str | None = None, react_url: str | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("Dashboard")
+        self.setMinimumSize(900, 600)
+        self.auth = auth
+        self.role = role or ""
+        self.username = username or ""
+        self.view = QWebEngineView(self)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.view)
+
+        # Load React app (dev server by default). You can switch to a local build path.
+        base = react_url or "http://localhost:3000"
+        # Pass user role/username to React via URL params
+        url = QUrl(f"{base}/?role={self.role}&user={self.username}")
+        self.view.setUrl(url)
 
 class AdminDashboard(QDialog):
     def __init__(self, parent=None, auth: Authentication | None = None):
