@@ -15,6 +15,7 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
 from authentication import Authentication
+from admin_dashboard import AdminDashboard
 
 
 class BrowserTab(QWidget):
@@ -122,14 +123,21 @@ class LoginWindow(QDialog):
         if role:
             QMessageBox.information(self, "Login Successful", f"Welcome, {username}! Role: {role}")
             self.login_successful = True
+            self.user_role = role
+            self.username = username
             self.close()  # Close the login window
         else:
             QMessageBox.warning(self, "Login Failed", "Invalid username or password. Please try again.")
+
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, auth=None, user_role=None, username=None):
         super().__init__()
         self.setWindowTitle("Simple Python Browser")
         self.resize(1200, 800)
+
+        self.auth = auth or Authentication(host="localhost", user="root", password="Innovation", database="edubrowser")
+        self.user_role = user_role
+        self.username = username
 
         # Tab Widget
         self.tabs = QTabWidget(movable=True, tabsClosable=True)
@@ -286,3 +294,7 @@ class MainWindow(QMainWindow):
             self.current_view().setZoomFactor(value)
         except ValueError:
             pass
+
+    def open_admin_dashboard(self):
+        dlg = AdminDashboard(self, auth=self.auth)
+        dlg.exec()
