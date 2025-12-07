@@ -365,17 +365,14 @@ else:
     print("Login failed!")
 ```
 
-## Contributing
+## Contributions
 
-To contribute to this project:
+Abhinav Paudel
 
-1. Create a new branch for your feature.
-2. Make your changes and test thoroughly.
-3. Submit a pull request with a clear description of the changes.
 
 ## License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+This project is licensed under Abhinav Paudel.
 
 ## Contact & Support
 
@@ -383,6 +380,6 @@ For issues, questions, or suggestions, please open an issue on the project repos
 
 ---
 
-**Last Updated**: 2025-12-05  
+**Last Updated**: 2025-12-07  
 **Maintainer**: Abhinav Paudel  
-**Status**: UnderDevelopment
+**Status**: Under Development
