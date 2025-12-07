@@ -1,34 +1,97 @@
-# Browser_sys
+Perfect — here is a **fully rewritten, polished, production-ready `README.md`**, with clean structure, dashboard integration, setup instructions, architecture, and future plans.
 
-A PyQt6-based web browser with user authentication, role-based access control, and URL filtering (whitelist/blacklist).
+You can copy and paste this directly into your repository.
 
-## Current Progress (as of 2025-12-05)
+---
 
-### Project Structure
+# **Browser_sys**
 
-- `browser.py` — Contains UI classes: `BrowserTab`, `LoginWindow`, and `MainWindow`.
-- `main.py` — Application entry point that creates the `QApplication` and runs the `LoginWindow` and `MainWindow`.
-- `authentication.py` — Handles user authentication and database operations.
-- `intial_setup.py` — Script to initialize the database with an admin user.
-- `.venv/` — Virtual environment containing all project dependencies.
-- `requirements.txt` — Pinned dependency list.
+A secure, role-based educational web browser built with **PyQt6**, **MySQL**, and an integrated **React dashboard** for administrative and teacher management tools.
 
-### Key Features
+Browser_sys provides a desktop environment for controlled web browsing with URL filtering, user authentication, role-based permissions, and system monitoring via a React-powered dashboard.
 
-- **User Authentication**: Login system with username and password validation.
-- **Role-Based Access Control**: Supports four user roles:
-  - `super-admin` — Full system access.
-  - `admin` — Administrative features.
-  - `teacher` — Teacher-specific features.
-  - `student` — Student-specific features.
-- **MySQL Database Integration**: Stores user credentials, whitelist, and blacklist.
-- **Web Browsing**: Basic web browsing functionality with tabs, navigation, and zoom controls.
+---
 
-### Database Schema
+# 🚀 **Features**
 
-The project uses a MySQL 9.1.0 database with the following tables.
+## ✅ **1. Authentication & User Management**
 
-#### Users Table
+* Login system with MySQL-backed credentials
+* Secure password hashing
+* User roles:
+
+  * `super-admin` — full system access
+  * `admin` — manages users and filters
+  * `teacher` — classroom tools
+  * `student` — restricted browsing
+* Records last login timestamp
+* Inactive user support
+
+## ✅ **2. Role-Based Browser Access**
+
+* Different UI controls depending on the user role
+* Dashboard button shown only for:
+  **super-admin**, **admin**, **teacher**
+
+## ✅ **3. PyQt6 Browser**
+
+* Built using `QWebEngineView`
+* Multi-tab browsing
+* Navigation (Back / Forward / Reload / Home)
+* Search & URL bar
+* Zoom controls (50%–200%)
+* Status bar & title updating
+
+## ✅ **4. URL Filtering**
+
+* Whitelist & blacklist support
+* MySQL-backed URL storage
+* (Upcoming) live filtering during browsing
+
+## ✅ **5. Admin / Teacher Dashboard**
+
+A separate PyQt6 window embeds a **React-based dashboard** for:
+
+* User management
+* Whitelist/blacklist management
+* System metrics
+* Classroom tools for teachers
+* Activity visualization (planned)
+
+Dashboard loads via:
+
+```
+http://localhost:3000/?role=<role>&user=<username>
+```
+
+or from a production build:
+
+```
+file:///path/to/react-dashboard/dist/index.html?role=<role>&user=<username>
+```
+
+---
+
+# 📁 **Project Structure**
+
+```
+Browser_sys/
+├── browser.py               # UI: BrowserTab, LoginWindow, MainWindow, DashboardWindow
+├── main.py                  # Application entry point
+├── authentication.py        # User auth & MySQL operations
+├── initial_setup.py         # Script to create first admin user
+├── react-dashboard/         # React dashboard (Vite + React)
+├── requirements.txt         # Python dependencies
+├── .venv/                   # Virtual environment
+└── README.md
+```
+
+---
+
+# 🗄️ **Database Schema (MySQL 9.x)**
+
+### **Users**
+
 ```sql
 CREATE TABLE Users (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -36,7 +99,7 @@ CREATE TABLE Users (
     password_hash VARCHAR(255) NOT NULL,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     permissions TEXT,
-    role ENUM('teacher', 'admin', 'student', 'super-admin') NOT NULL,
+    role ENUM('teacher','admin','student','super-admin') NOT NULL,
     last_login DATETIME,
     group_code VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -44,7 +107,8 @@ CREATE TABLE Users (
 );
 ```
 
-#### Whitelist Table
+### **Whitelist**
+
 ```sql
 CREATE TABLE Whitelist (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -53,11 +117,12 @@ CREATE TABLE Whitelist (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT 1,
     added_by INT,
-    FOREIGN KEY (added_by) REFERENCES Users (id)
+    FOREIGN KEY (added_by) REFERENCES Users(id)
 );
 ```
 
-#### Blacklist Table
+### **Blacklist**
+
 ```sql
 CREATE TABLE Blacklist (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -66,320 +131,214 @@ CREATE TABLE Blacklist (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT 1,
     added_by INT,
-    FOREIGN KEY (added_by) REFERENCES Users (id)
+    FOREIGN KEY (added_by) REFERENCES Users(id)
 );
 ```
 
-## Installation & Setup
+---
 
-### Prerequisites
+# 🛠️ **Installation & Setup**
 
-- Python 3.10 or higher
-- MySQL 9.1.0 or higher
-- pip (Python package manager)
+## 1. Clone the repository
 
-### Steps
-
-1. **Clone the repository** (if applicable):
-   ```bash
-   git clone <repository-url>
-   cd Browser_sys
-   ```
-
-2. **Create and activate the virtual environment**:
-
-   **macOS/Linux:**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-   **Windows (PowerShell):**
-   ```powershell
-   python -m venv venv
-   .\venv\Scripts\Activate.ps1
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up the MySQL database**:
-   - Create the `edubrowser` database:
-     ```sql
-     CREATE DATABASE edubrowser;
-     ```
-   - Create the required tables using the schema provided above.
-   - Ensure the MySQL user has appropriate permissions (example using `root`):
-     ```sql
-     GRANT ALL PRIVILEGES ON edubrowser.* TO 'root'@'localhost' IDENTIFIED BY 'Innovation';
-     FLUSH PRIVILEGES;
-     ```
-
-5. **Initialize the database with an admin user**:
-   ```bash
-   python intial_setup.py
-   ```
-
-   This will create an `admin` user with the following credentials (change in production):
-   - Username: `admin`
-   - Password: `admin123`
-   - Role: `super-admin`
-
-6. **Run the application**:
-   ```bash
-   python main.py
-   ```
-
-## How to Run
-
-### macOS/Linux
-
-1. Activate the virtual environment:
-   ```bash
-   source venv/bin/activate
-   ```
-
-2. Run the application:
-   ```bash
-   python main.py
-   ```
-
-### Windows (PowerShell)
-
-1. Set execution policy (if needed):
-   ```powershell
-   Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
-   ```
-
-2. Activate the virtual environment:
-   ```powershell
-   .\venv\Scripts\Activate.ps1
-   ```
-
-3. Run the application:
-   ```powershell
-   python main.py
-   ```
-
-### Windows (Command Prompt)
-
-1. Activate the virtual environment:
-   ```cmd
-   venv\Scripts\activate
-   ```
-
-2. Run the application:
-   ```cmd
-   python main.py
-   ```
-
-## Troubleshooting
-
-### MySQL Connection Error
-
-**Error**: `Access denied for user 'root'@'localhost' (using password: YES)`
-
-**Solution**:
-1. Verify MySQL credentials in 
-
-authentication.py
-
- or when instantiating `Authentication`:
-   ```python
-   auth = Authentication(host="localhost", user="root", password="Innovation", database="edubrowser")
-   ```
-2. Ensure the `edubrowser` database exists and the user has privileges.
-3. Create a dedicated DB user if necessary:
-   ```sql
-   CREATE USER 'browser_user'@'localhost' IDENTIFIED BY 'secure_password';
-   GRANT ALL PRIVILEGES ON edubrowser.* TO 'browser_user'@'localhost';
-   FLUSH PRIVILEGES;
-   ```
-
-### Role / Enum or Constraint Errors
-
-If you get errors inserting a role (e.g., "Data truncated for column 'role'"), confirm the role column allows the value (`super-admin`) or adjust the column definition to use ENUM or VARCHAR and validate in application code.
-
-### `id` Column Errors
-
-If MySQL complains "Field 'id' doesn't have a default value", ensure `id` is defined with `AUTO_INCREMENT`:
-```sql
-ALTER TABLE Users MODIFY id INT NOT NULL AUTO_INCREMENT;
-```
-
-### PyQt6 Import Errors
-
-Ensure `PyQt6` and `PyQt6-WebEngine` are installed:
 ```bash
-pip install PyQt6==6.10.0 PyQt6-WebEngine==6.10.0
+git clone <repository-url>
+cd Browser_sys
 ```
 
-### Python Interpreter Issues (VS Code)
+## 2. Create virtual environment
 
-1. Open Command Palette: `Cmd+Shift+P`.
-2. Select `Python: Select Interpreter`.
-3. Choose the interpreter from the `.venv/` directory.
+### macOS / Linux
 
-## Requirements
-
-All dependencies are listed in 
-
-requirements.txt
-
-:
-
-```
-PyQt6==6.10.0
-PyQt6-WebEngine==6.10.0
-PyQt6-sip==13.8.0
-mysql-connector-python==9.0.0
+```bash
+python3 -m venv venv
+source venv/bin/activate
 ```
 
-To install all requirements:
+### Windows
+
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
+
+## 3. Install Python dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-## Features & Functionalities
+## 4. Configure MySQL
 
-### Browser Features
-- **Tab Management**: Open multiple tabs with `Ctrl+T`, close tabs with `Ctrl+W`.
-- **Navigation**: Back, Forward, Reload, and Home buttons.
-- **URL Bar**: Enter URLs and search queries.
-- **Zoom Controls**: Adjust zoom level from 50% to 200%.
-- **Status Bar**: Display page loading status.
+Create the database:
 
-### Authentication Features
-- **Login Window**: Secure login with username and password.
-- **User Validation**: Checks user credentials against the database.
-- **Last Login Tracking**: Records the last login time for each user.
-- **Role-Based Access**: Different permissions for different user roles.
-
-### Database Features
-- **User Management**: Store user credentials with hashed passwords.
-- **URL Filtering**: Whitelist and blacklist URLs for content control.
-- **Audit Trail**: Track user login history and URL access.
-
-## Future Enhancements
-
-- URL filtering using the Whitelist and Blacklist tables.
-- Role-based access to browser features.
-- User management dashboard for admins.
-- Session management and logout functionality.
-- Student monitoring and activity logging.
-- Advanced content filtering and parental controls.
-- Multi-language support.
-
-## Project Structure
-
-```
-Browser_sys/
-├── .venv/                    # Virtual environment
-├── .vscode/
-│   └── settings.json         # VS Code settings
-├── browser.py               # UI classes (BrowserTab, LoginWindow, MainWindow)
-├── main.py                  # Application entry point
-├── authentication.py        # Authentication and database operations
-├── intial_setup.py          # Database initialization script
-├── requirements.txt         # Project dependencies
-└── README.md               # This file
+```sql
+CREATE DATABASE edubrowser;
 ```
 
-## API & Class Documentation
+Grant privileges:
 
-### Authentication Class
-
-**File**: 
-
-authentication.py
-
-
-
-**Methods**:
-- `__init__(host, user, password, database)` — Initialize database connection.
-- `register_user(username, password, role, permissions, group_code)` — Register a new user.
-- `validate_user(username, password)` — Validate user credentials and return role.
-
-### BrowserTab Class
-
-**File**: 
-
-browser.py
-
-
-
-**Methods**:
-- `__init__(parent)` — Initialize browser tab with web engine view.
-- `on_url_changed(qurl)` — Handle URL changes.
-- `on_title_changed(title)` — Handle page title changes.
-- `on_load_finished(ok)` — Handle page load completion.
-
-### LoginWindow Class
-
-**File**: 
-
-browser.py
-
-
-
-**Methods**:
-- `__init__()` — Initialize login dialog.
-- `handle_login()` — Process login form submission.
-
-### MainWindow Class
-
-**File**: 
-
-browser.py
-
-
-
-**Methods**:
-- `__init__()` — Initialize main browser window.
-- `setup_toolbar()` — Set up navigation toolbar.
-- `setup_menu()` — Set up menu bar.
-- `add_tab()` — Open a new browser tab.
-- `close_tab(index)` — Close a browser tab.
-- `navigate_to_url()` — Navigate to URL from address bar.
-- `navigate_home()` — Navigate to home page (Google).
-- `on_zoom_changed(text)` — Handle zoom level changes.
-
-## Usage Examples
-
-### Creating a New User (Admin)
-```python
-from authentication import Authentication
-
-auth = Authentication(host="localhost", user="root", password="Innovation", database="edubrowser")
-auth.register_user("teacher_user", "password123", "teacher", permissions="basic", group_code="CLASS_A")
+```sql
+GRANT ALL PRIVILEGES ON edubrowser.* TO 'root'@'localhost' IDENTIFIED BY 'Innovation';
+FLUSH PRIVILEGES;
 ```
 
-### Validating User Login
-```python
-role = auth.validate_user("admin", "admin123")
-if role:
-    print(f"Login successful! Role: {role}")
-else:
-    print("Login failed!")
+Create tables (schema above).
+
+## 5. Initialize admin user
+
+```bash
+python initial_setup.py
 ```
 
-## Contributions
+Default credentials (change in production!):
 
-Abhinav Paudel
-
-
-## License
-
-This project is licensed under Abhinav Paudel.
-
-## Contact & Support
-
-For issues, questions, or suggestions, please open an issue on the project repository.
+* Username: **admin**
+* Password: **admin123**
+* Role: **super-admin**
 
 ---
 
-**Last Updated**: 2025-12-07  
-**Maintainer**: Abhinav Paudel  
-**Status**: Under Development
+# 📊 **Dashboard (React)**
+
+The dashboard is built using **Vite + React**, located inside:
+
+```
+react-dashboard/
+```
+
+### Install & Run (Development)
+
+```bash
+cd react-dashboard
+npm install
+npm run dev
+```
+
+Runs at:
+
+```
+http://localhost:3000
+```
+
+### Build for Production
+
+```bash
+npm run build
+```
+
+The built files appear in:
+
+```
+react-dashboard/dist/
+```
+
+### Dashboard Loading in Python
+
+```python
+url = f"http://localhost:3000/?role={role}&user={username}"
+# or production build:
+# url = f"file:///absolute/path/to/dist/index.html?role={role}&user={username}"
+```
+
+### Who Can Access the Dashboard?
+
+| Role        | Dashboard Access |
+| ----------- | ---------------- |
+| super-admin | ✅ Full Access    |
+| admin       | ✅ Admin Tools    |
+| teacher     | ✅ Teacher Tools  |
+| student     | ❌ No Access      |
+
+---
+
+# ▶️ **Running the Application**
+
+Start the dashboard (optional):
+
+```bash
+cd react-dashboard
+npm run dev
+```
+
+Run Browser_sys:
+
+```bash
+source venv/bin/activate
+python main.py
+```
+
+---
+
+# 🧰 **Troubleshooting**
+
+### MySQL Errors
+
+* *Access denied*: check credentials in `authentication.py`
+* *Field 'id' doesn't have default*: ensure `AUTO_INCREMENT`
+* *Invalid role inserted*: confirm ENUM matches role names
+
+### PyQt6 Issues
+
+Install WebEngine:
+
+```bash
+pip install PyQt6 PyQt6-WebEngine
+```
+
+### macOS WebEngine crashes
+
+Set environment flags:
+
+```bash
+export QTWEBENGINE_DISABLE_SANDBOX=1
+export QTWEBENGINE_CHROMIUM_FLAGS="--disable-gpu --no-sandbox"
+```
+
+---
+
+# 📘 **API & Class Summary**
+
+## `Authentication` (authentication.py)
+
+* `register_user(username, password, role, permissions, group_code)`
+* `validate_user(username, password)`
+* MySQL connection & queries
+
+## `BrowserTab` (browser.py)
+
+* Handles tab browsing, loading, navigation, zoom, title updates
+
+## `LoginWindow` (browser.py)
+
+* Login UI
+* Sends results to MainWindow
+
+## `MainWindow` (browser.py)
+
+* Hosts tab manager
+* Toolbar & actions
+* Dashboard button (role-based)
+
+## `DashboardWindow` (browser.py)
+
+* Loads and displays React dashboard
+
+---
+
+# 📅 **Roadmap**
+
+* 🔒 Enforce whitelist/blacklist filtering
+* 🧑‍🏫 Classroom monitoring tools
+* 🧾 Activity logging (per student)
+* 📚 Multi-language support
+* 🏫 School-wide admin controls
+* 🔐 Session timeout + logout
+* 🧩 Extension-style plugin support
+
+---
+
+# 👤 **Maintainer**
+
+**Abhinav Paudel**
+*Last Updated: 2025-12-07
