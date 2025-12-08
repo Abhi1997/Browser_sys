@@ -18,12 +18,23 @@ class DashboardWindow(QDialog):
         self.view = QWebEngineView(self)
         layout = QVBoxLayout(self)
         layout.addWidget(self.view)
-
-        # Load React app (dev server by default). You can switch to a local build path.
         base = react_url or "http://localhost:3000"
-        # Pass user role/username to React via URL params
-        url = QUrl(f"{base}/?role={self.role}&user={self.username}")
-        self.view.setUrl(url)
+        self.view.setUrl(QUrl(f"{base}/?role={self.role}&user={self.username}"))
+
+# Base list view helper
+def _load_users(list_widget, auth: Authentication):
+    try:
+        conn = mysql.connector.connect(**auth.db_config)
+        cur = conn.cursor()
+        cur.execute("SELECT id, username, role, last_login, is_active FROM Users ORDER BY id ASC")
+        for id_, username, role, last_login, is_active in cur.fetchall():
+            last = last_login.strftime("%Y-%m-%d %H:%M:%S") if isinstance(last_login, datetime) else (str(last_login) if last_login else "never")
+            active = "active" if int(is_active) else "inactive"
+            list_widget.addItem(f"{id_:>3} | {username} | {role} | last_login: {last} | {active}")
+        cur.close()
+        conn.close()
+    except Exception as e:
+        QMessageBox.warning(list_widget, "Error", f"Failed to load users: {e}")
 
 class AdminDashboard(QDialog):
     def __init__(self, parent=None, auth: Authentication | None = None):
@@ -31,41 +42,48 @@ class AdminDashboard(QDialog):
         self.setWindowTitle("Admin Dashboard")
         self.setMinimumSize(600, 400)
         self.auth = auth or Authentication()
-
         layout = QVBoxLayout(self)
-
-        header = QLabel("Admin Dashboard — Users")
-        layout.addWidget(header)
-
+        layout.addWidget(QLabel("Admin — Users"))
         self.user_list = QListWidget()
         layout.addWidget(self.user_list)
-
-        btn_layout = QHBoxLayout()
-        self.refresh_btn = QPushButton("Refresh")
-        self.refresh_btn.clicked.connect(self.load_users)
-        btn_layout.addWidget(self.refresh_btn)
-
-        self.close_btn = QPushButton("Close")
-        self.close_btn.clicked.connect(self.close)
-        btn_layout.addWidget(self.close_btn)
-
-        layout.addLayout(btn_layout)
-
+        btns = QHBoxLayout()
+        refresh = QPushButton("Refresh"); refresh.clicked.connect(self.load_users); btns.addWidget(refresh)
+        close = QPushButton("Close"); close.clicked.connect(self.close); btns.addWidget(close)
+        layout.addLayout(btns)
         self.load_users()
+    def load_users(self): self.user_list.clear(); _load_users(self.user_list, self.auth)
 
-    def load_users(self):
-        self.user_list.clear()
-        try:
-            conn = mysql.connector.connect(**self.auth.db_config)
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, username, role, last_login, is_active FROM Users ORDER BY id ASC")
-            rows = cursor.fetchall()
-            for r in rows:
-                id_, username, role, last_login, is_active = r
-                last = last_login.strftime("%Y-%m-%d %H:%M:%S") if isinstance(last_login, datetime) else (str(last_login) if last_login else "never")
-                active = "active" if int(is_active) else "inactive"
-                self.user_list.addItem(f"{id_:>3} | {username} | {role} | last_login: {last} | {active}")
-            cursor.close()
-            conn.close()
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to load users: {e}")
+class TeacherDashboard(QDialog):
+    def __init__(self, parent=None, auth: Authentication | None = None, username: str | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("Teacher Dashboard")
+        self.setMinimumSize(600, 400)
+        self.auth = auth or Authentication()
+        self.username = username or ""
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(f"Teacher — {self.username}"))
+        self.user_list = QListWidget()
+        layout.addWidget(self.user_list)
+        btns = QHBoxLayout()
+        refresh = QPushButton("Refresh Class"); refresh.clicked.connect(self.load_users); btns.addWidget(refresh)
+        close = QPushButton("Close"); close.clicked.connect(self.close); btns.addWidget(close)
+        layout.addLayout(btns)
+        self.load_users()
+    def load_users(self): self.user_list.clear(); _load_users(self.user_list, self.auth)
+
+class SuperAdminDashboard(QDialog):
+    def __init__(self, parent=None, auth: Authentication | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("Super Admin Dashboard")
+        self.setMinimumSize(700, 450)
+        self.auth = auth or Authentication()
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Super Admin — Global Overview"))
+        self.user_list = QListWidget()
+        layout.addWidget(self.user_list)
+        btns = QHBoxLayout()
+        refresh = QPushButton("Refresh All"); refresh.clicked.connect(self.load_users); btns.addWidget(refresh)
+        close = QPushButton("Close"); close.clicked.connect(self.close); btns.addWidget(close)
+        layout.addLayout(btns)
+        self.load_users()
+    def load_users(self): self.user_list.clear(); _load_users(self.user_list, self.auth)
