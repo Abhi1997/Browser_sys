@@ -16,6 +16,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
 from authentication import Authentication
 from admin_dashboard import AdminDashboard, DashboardWindow
+from admin_dashboard import AdminDashboard, TeacherDashboard, SuperAdminDashboard, DashboardWindow
 
 
 class BrowserTab(QWidget):
@@ -315,7 +316,22 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def open_dashboard(self):
-        # Point to React dev server; change to file URL of build for production
-        react_url = "http://localhost:3000"
-        dlg = DashboardWindow(self, auth=self.auth, role=self.user_role, username=self.username, react_url=react_url)
-        dlg.exec()
+        if self.user_role in ("admin", "super-admin", "teacher"):
+            base = "http://localhost:3000"
+            route_map = {
+                "super-admin": "/dashboard/super-admin",
+                "admin": "/dashboard/admin",
+                "teacher": "/dashboard/teacher",
+            }
+            path = route_map.get(self.user_role, "/dashboard")
+            url = f"{base}{path}?user={self.username}"
+            dlg = DashboardWindow(
+                self,
+                auth=self.auth,
+                role=self.user_role,
+                username=self.username,
+                react_url=url  # pass full URL
+            )
+            dlg.exec()
+        else:
+            QMessageBox.information(self, "Info", "Dashboard is not available for this role.")

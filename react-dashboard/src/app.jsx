@@ -1,27 +1,14 @@
-import React, { useMemo } from 'react'
+import React from 'react'
+import { Routes, Route, useSearchParams } from 'react-router-dom'
 
-function useQuery() {
-  return useMemo(() => new URLSearchParams(window.location.search), [])
-}
-
-export default function App() {
-  const q = useQuery()
-  const role = q.get('role') || 'guest'
-  const user = q.get('user') || 'unknown'
-
+function Layout({ children }) {
+  const [params] = useSearchParams()
+  const user = params.get('user') || 'unknown'
   return (
     <div style={{ fontFamily: 'system-ui', padding: 20 }}>
       <h1>Dashboard</h1>
       <p>User: <b>{user}</b></p>
-      <p>Role: <b>{role}</b></p>
-
-      {role === 'super-admin' && <SuperAdminPanel />}
-      {role === 'admin' && <AdminPanel />}
-      {role === 'teacher' && <TeacherPanel />}
-      {role === 'student' && <StudentPanel />}
-
-      <hr />
-      <p>Tip: This app is embedded in PyQt6 QWebEngineView.</p>
+      {children}
     </div>
   )
 }
@@ -85,5 +72,16 @@ function StudentPanel() {
         <p>Limited access.</p>
       </Card>
     </>
+  )
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/dashboard/super-admin" element={<Layout><SuperAdminPanel /></Layout>} />
+      <Route path="/dashboard/admin" element={<Layout><AdminPanel /></Layout>} />
+      <Route path="/dashboard/teacher" element={<Layout><TeacherPanel /></Layout>} />
+      <Route path="*" element={<Layout><p>No route matched.</p></Layout>} />
+    </Routes>
   )
 }
