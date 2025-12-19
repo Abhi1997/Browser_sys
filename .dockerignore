@@ -1,0 +1,37 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyd
+*.pyo
+*.pyc
+
+# Virtual Environments
+.env
+.venv/
+venv/
+
+# Build / Distribution
+dist/
+build/
+
+# MacOS
+.DS_Store
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# --- React Dashboard ---
+react-dashboard/node_modules/
+react-dashboard/dist/
+react-dashboard/.vite/
+react-dashboard/.DS_Store
+
+# --- Logs ---
+*.log
+
+# --- Docker ---
+# Do not ignore Dockerfile unless intentional
+# docker-compose retains local volumes

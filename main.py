@@ -5,22 +5,30 @@ from PyQt6.QtWidgets import QApplication
 from browser import MainWindow, LoginWindow
 
 def main():
-    # Env flags to stabilize Qt WebEngine on macOS
-    os.environ.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
-    os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu --disable-software-rasterizer --no-sandbox")
+    # macOS stability flags
+    os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
+    os.environ["QT_OPENGL"] = "software"
+    os.environ["QT_QUICK_BACKEND"] = "software"
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+        "--disable-gpu --disable-software-rasterizer --no-sandbox "
+        "--disable-features=UseOzonePlatform,VizDisplayCompositor "
+        "--js-flags=--max-old-space-size=128 --lite-mode"
+    )
 
-    # Must be set before creating QApplication
+    # set before QApplication
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
 
     app = QApplication(sys.argv)
 
-    # Show login window
     login_window = LoginWindow()
-    login_window.exec()  # Block until the login window is closed
+    login_window.exec()
 
-    # If login is successful, open the browser app and pass auth & role
     if getattr(login_window, "login_successful", False):
-        window = MainWindow(auth=login_window.auth, user_role=getattr(login_window, "user_role", None), username=getattr(login_window, "username", None))
+        window = MainWindow(
+            auth=login_window.auth,
+            user_role=getattr(login_window, "user_role", None),
+            username=getattr(login_window, "username", None),
+        )
         window.show()
         sys.exit(app.exec())
     else:
