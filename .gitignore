@@ -20,3 +20,8 @@ react-dashboard/.DS_Store
 
 # macOS
 .DS_Store
+
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.vite/
+dashboard/.DS_Store
