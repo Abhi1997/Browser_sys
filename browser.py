@@ -317,7 +317,7 @@ class MainWindow(QMainWindow):
 
     def open_dashboard(self):
         if self.user_role in ("admin", "super-admin", "teacher"):
-            base = "http://localhost:3000"
+            base = "http://localhost:8080"
             route_map = {
                 "super-admin": "/dashboard/super-admin",
                 "admin": "/dashboard/admin",
