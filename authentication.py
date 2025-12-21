@@ -18,7 +18,7 @@ class Authentication:
         }
 
     def register_user(self, username, password, role, permissions=None, group_code=None):
-        if role not in ("teacher", "admin", "student", "super-admin"):
+        if role not in ("teacher", "admin", "student", "superadmin"):
             raise ValueError("Invalid role")
         hashed_password = sha256(password.encode()).hexdigest()
         created_at = datetime.now()
