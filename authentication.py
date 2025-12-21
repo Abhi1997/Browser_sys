@@ -4,7 +4,9 @@ import os
 from dotenv import load_dotenv
 import mysql.connector
 from hashlib import sha256
-from datetime import datetime
+from datetime import datetime, timedelta
+import jwt
+import uuid
 
 load_dotenv()  # load .env if present
 
@@ -54,3 +56,39 @@ class Authentication:
         cursor.close()
         conn.close()
         return None
+
+    def validate_user_with_id(self, username, password):
+        """Validate user and return both role and user_id"""
+        hashed_password = sha256(password.encode()).hexdigest()
+        conn = mysql.connector.connect(**self.db_config)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, role FROM Users WHERE username=%s AND password_hash=%s AND is_active=1
+        """, (username, hashed_password))
+        user = cursor.fetchone()
+        if user:
+            user_id, role = user
+            cursor.execute("UPDATE Users SET last_login=%s WHERE id=%s", (datetime.now(), user_id))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return (role, user_id)
+        cursor.close()
+        conn.close()
+        return None
+
+    def generate_token(self, username, role, user_id):
+        """Generate JWT token for dashboard authentication"""
+        secret_key = os.getenv("JWT_SECRET", "your-secret-key-change-this")
+        payload = {
+            "user_id": user_id,
+            "username": username,
+            "role": role,
+            "exp": datetime.utcnow() + timedelta(hours=24),
+            "iat": datetime.utcnow()
+        }
+        return jwt.encode(payload, secret_key, algorithm="HS256")
+
+    def generate_device_id(self):
+        """Generate a unique device ID"""
+        return str(uuid.uuid4())

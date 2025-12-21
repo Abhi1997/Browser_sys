@@ -28,6 +28,7 @@ def main():
             auth=login_window.auth,
             user_role=getattr(login_window, "user_role", None),
             username=getattr(login_window, "username", None),
+            user_id=getattr(login_window, "user_id", None),
         )
         window.show()
         sys.exit(app.exec())

@@ -120,18 +120,20 @@ class LoginWindow(QDialog):
             QMessageBox.warning(self, "Login Failed", "Please enter both username and password.")
             return
 
-        role = self.auth.validate_user(username, password)
-        if role:
+        result = self.auth.validate_user_with_id(username, password)
+        if result:
+            role, user_id = result
             QMessageBox.information(self, "Login Successful", f"Welcome, {username}! Role: {role}")
             self.login_successful = True
             self.user_role = role
             self.username = username
+            self.user_id = user_id
             self.close()  # Close the login window
         else:
             QMessageBox.warning(self, "Login Failed", "Invalid username or password. Please try again.")
 
 class MainWindow(QMainWindow):
-    def __init__(self, auth=None, user_role=None, username=None):
+    def __init__(self, auth=None, user_role=None, username=None, user_id=None):
         super().__init__()
         self.setWindowTitle("Simple Python Browser")
         self.resize(1200, 800)
@@ -139,6 +141,7 @@ class MainWindow(QMainWindow):
         self.auth = auth or Authentication(host="localhost", user="root", password="Innovation", database="edubrowser")
         self.user_role = user_role
         self.username = username
+        self.user_id = user_id
 
         # Tab Widget
         self.tabs = QTabWidget(movable=True, tabsClosable=True)
@@ -317,14 +320,18 @@ class MainWindow(QMainWindow):
 
     def open_dashboard(self):
         if self.user_role in ("admin", "superadmin", "teacher"):
+            # Generate token and device ID for dashboard authentication
+            token = self.auth.generate_token(self.username, self.user_role, self.user_id)
+            device_id = self.auth.generate_device_id()
+            
             base = "http://localhost:3000"
             route_map = {
-                "superadmin": "/dashboard/superadmin",
-                "admin": "/dashboard/admin",
-                "teacher": "/dashboard/teacher",
+                "superadmin": "#/dashboard/super-admin",
+                "admin": "#/dashboard/admin",
+                "teacher": "#/dashboard/teacher",
             }
-            path = route_map.get(self.user_role, "/dashboard")
-            url = f"{base}{path}?user={self.username}"
+            path = route_map.get(self.user_role, "#/dashboard")
+            url = f"{base}/{path}?token={token}&deviceId={device_id}"
             dlg = DashboardWindow(
                 self,
                 auth=self.auth,
