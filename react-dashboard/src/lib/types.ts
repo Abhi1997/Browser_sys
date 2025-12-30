@@ -19,10 +19,11 @@ export interface AuthToken {
 }
 
 export interface JWTPayload {
-  userId: string;
+  userId?: string;  // camelCase (React)
+  user_id?: number; // snake_case (Python) - also accepted
   username: string;
   role: UserRole;
-  deviceId: string;
+  deviceId?: string;
   adminId?: string;
   exp: number;
   iat: number;

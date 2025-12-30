@@ -1,8 +1,15 @@
 import React from 'react';
 import { ShieldX, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { getQueryParams } from '@/lib/auth';
 
 export default function Unauthorized() {
+  const { user, role, isLoading, isAuthenticated, error } = useAuth();
+  const params = getQueryParams();
+  const hasToken = !!params.token;
+  const hasDeviceId = !!params.deviceId;
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="max-w-md text-center animate-slide-up">
@@ -36,6 +43,22 @@ export default function Unauthorized() {
             Students are not allowed dashboard access
           </li>
         </ul>
+
+        {/* Debug Information */}
+        <div className="mb-8 glass-card p-4 text-left">
+          <p className="text-sm font-semibold text-foreground mb-2">
+            Debug Information:
+          </p>
+          <div className="text-xs text-muted-foreground font-mono space-y-1">
+            <div>User: {user ? user.username : 'Not loaded'}</div>
+            <div>Role: {role || 'Not set'}</div>
+            <div>Authenticated: {isAuthenticated ? 'Yes' : 'No'}</div>
+            <div>Loading: {isLoading ? 'Yes' : 'No'}</div>
+            <div>Token in URL: {hasToken ? 'Yes' : 'No'}</div>
+            <div>Device ID in URL: {hasDeviceId ? 'Yes' : 'No'}</div>
+            {error && <div className="text-destructive">Error: {error}</div>}
+          </div>
+        </div>
         
         <Button 
           variant="outline" 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -9,21 +9,45 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { mockAdminStats } from '@/lib/mock-data';
+import { useUsers } from '@/hooks/useDashboardData';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface AdminComparisonChartProps {
-  data?: typeof mockAdminStats;
   className?: string;
 }
 
-export function AdminComparisonChart({ data = mockAdminStats, className }: AdminComparisonChartProps) {
-  const chartData = data.map(admin => ({
-    name: admin.adminName.split(' ')[0], // Shorten name
-    fullName: admin.adminName,
-    teachers: admin.teachers,
-    students: admin.students,
-    activeSessions: admin.activeSessions,
-  }));
+export function AdminComparisonChart({ className }: AdminComparisonChartProps) {
+  const { data: users, isLoading } = useUsers();
+
+  const chartData = useMemo(() => {
+    if (!users) return [];
+
+    // For now, create a single entry representing the system
+    const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super-admin');
+    const teacherUsers = users.filter((u: any) => u.role === 'teacher');
+    const studentUsers = users.filter((u: any) => u.role === 'student');
+    const activeUsers = users.filter((u: any) => u.isActive);
+
+    if (adminUsers.length === 0) return [];
+
+    return [{
+      name: 'System',
+      fullName: 'System Overview',
+      teachers: teacherUsers.length,
+      students: studentUsers.length,
+      activeSessions: activeUsers.length,
+    }];
+  }, [users]);
+
+  if (isLoading) {
+    return (
+      <div className={className}>
+        <div className="glass-card p-6">
+          <Skeleton className="h-[300px] w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
@@ -33,8 +57,13 @@ export function AdminComparisonChart({ data = mockAdminStats, className }: Admin
           <p className="text-sm text-muted-foreground">Users per institution</p>
         </div>
         <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} barCategoryGap="20%">
+          {chartData.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>No data available</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} barCategoryGap="20%">
               <CartesianGrid 
                 strokeDasharray="3 3" 
                 stroke="hsl(217, 33%, 17%)" 
@@ -88,8 +117,9 @@ export function AdminComparisonChart({ data = mockAdminStats, className }: Admin
                 fill="hsl(217, 91%, 60%)" 
                 radius={[4, 4, 0, 0]}
               />
-            </BarChart>
-          </ResponsiveContainer>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>

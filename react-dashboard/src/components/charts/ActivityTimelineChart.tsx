@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -9,22 +9,68 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { mockActivityData } from '@/lib/mock-data';
+import { useActivity } from '@/hooks/useDashboardData';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ActivityTimelineChartProps {
-  data?: typeof mockActivityData;
   className?: string;
 }
 
-export function ActivityTimelineChart({ data = mockActivityData, className }: ActivityTimelineChartProps) {
-  const formattedData = data.map(item => ({
-    ...item,
-    time: new Date(item.timestamp).toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: false 
-    }),
-  }));
+export function ActivityTimelineChart({ className }: ActivityTimelineChartProps) {
+  const { data: activities, isLoading } = useActivity(undefined, 100);
+
+  const formattedData = useMemo(() => {
+    if (!activities || activities.length === 0) {
+      return [];
+    }
+
+    // Group activities by hour for the last 24 hours
+    const now = new Date();
+    const hours = Array.from({ length: 24 }, (_, i) => {
+      const hour = new Date(now);
+      hour.setHours(now.getHours() - (23 - i));
+      hour.setMinutes(0);
+      hour.setSeconds(0);
+      hour.setMilliseconds(0);
+      return hour;
+    });
+
+    const grouped = hours.map(hour => {
+      const hourEnd = new Date(hour);
+      hourEnd.setHours(hour.getHours() + 1);
+
+      const hourActivities = activities.filter((a: any) => {
+        const activityTime = new Date(a.visitStart || a.createdAt);
+        return activityTime >= hour && activityTime < hourEnd;
+      });
+
+      const uniqueStudents = new Set(hourActivities.map((a: any) => a.studentId)).size;
+
+      return {
+        timestamp: hour.toISOString(),
+        time: hour.toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false 
+        }),
+        activeStudents: uniqueStudents,
+        pageViews: hourActivities.length,
+        interactions: hourActivities.filter((a: any) => a.isAllowed).length,
+      };
+    });
+
+    return grouped;
+  }, [activities]);
+
+  if (isLoading) {
+    return (
+      <div className={className}>
+        <div className="glass-card p-6">
+          <Skeleton className="h-[300px] w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
@@ -34,8 +80,13 @@ export function ActivityTimelineChart({ data = mockActivityData, className }: Ac
           <p className="text-sm text-muted-foreground">Last 24 hours activity</p>
         </div>
         <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={formattedData}>
+          {formattedData.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>No activity data available</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={formattedData}>
               <CartesianGrid 
                 strokeDasharray="3 3" 
                 stroke="hsl(217, 33%, 17%)" 
@@ -95,8 +146,9 @@ export function ActivityTimelineChart({ data = mockActivityData, className }: Ac
                 dot={false}
                 activeDot={{ r: 6, fill: 'hsl(262, 83%, 58%)' }}
               />
-            </LineChart>
-          </ResponsiveContainer>
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>

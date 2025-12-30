@@ -63,19 +63,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Extract user from token for immediate use
       const tokenUser = extractUserFromToken(token);
-      if (tokenUser) {
-        setUser(tokenUser);
+      if (!tokenUser) {
+        setError('Failed to extract user information from token. Token may be invalid or malformed.');
+        setIsLoading(false);
+        return;
       }
+      
+      // Set user immediately from token
+      setUser(tokenUser);
 
       // Verify with backend (in production)
       try {
         const response = await verifyToken();
         if (response.success && response.data) {
+          // Update user with verified data from backend
           setUser(response.data.user);
+        } else {
+          // API verification failed, but we have token data, so continue with token user
+          // Don't set error here - we'll use token data as fallback
         }
-      } catch {
+      } catch (err) {
         // If API fails, use token data (for demo/offline mode)
-        console.log('Using token data (API verification unavailable)');
+        // Don't set error here - we'll use token data as fallback
       }
 
     } catch (err) {
@@ -106,6 +115,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     selectedAdminId,
     setSelectedAdminId,
   };
+
+  // Show error in UI if authentication fails (for PyQt6 browsers without console)
+  if (error && !isLoading) {
+    return (
+      <div style={{ 
+        padding: '2rem', 
+        textAlign: 'center', 
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        background: '#fef2f2',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }}>
+        <h1 style={{ color: '#dc2626', fontSize: '1.5rem', marginBottom: '1rem' }}>
+          Authentication Error
+        </h1>
+        <p style={{ color: '#991b1b', fontSize: '1rem', marginBottom: '0.5rem' }}>
+          {error}
+        </p>
+        <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '1rem' }}>
+          Please close this window and try opening the dashboard again from the browser application.
+        </p>
+        <div style={{ marginTop: '2rem', padding: '1rem', background: '#fff', borderRadius: '0.5rem', textAlign: 'left', maxWidth: '600px' }}>
+          <p style={{ fontSize: '0.875rem', color: '#374151', marginBottom: '0.5rem' }}>
+            <strong>Debug Information:</strong>
+          </p>
+          <p style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'monospace' }}>
+            User: {user ? user.username : 'Not loaded'}<br/>
+            Role: {user?.role || 'Not set'} (Type: {typeof user?.role})<br/>
+            Loading: {isLoading ? 'Yes' : 'No'}<br/>
+            Authenticated: {!!user ? 'Yes' : 'No'}<br/>
+            Error: {error || 'None'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Show debug info if user is not authenticated (even without error)
+  if (!isLoading && !user && !error) {
+    // Try to get token from URL to debug
+    const params = getQueryParams();
+    const hasToken = !!params.token;
+    const hasDeviceId = !!params.deviceId;
+    
+    return (
+      <div style={{ 
+        padding: '2rem', 
+        textAlign: 'center', 
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        background: '#fef9e7',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }}>
+        <h1 style={{ color: '#d97706', fontSize: '1.5rem', marginBottom: '1rem' }}>
+          Authentication Failed
+        </h1>
+        <p style={{ color: '#92400e', fontSize: '1rem', marginBottom: '0.5rem' }}>
+          Could not extract user information from token.
+        </p>
+        <div style={{ marginTop: '2rem', padding: '1rem', background: '#fff', borderRadius: '0.5rem', textAlign: 'left', maxWidth: '600px' }}>
+          <p style={{ fontSize: '0.875rem', color: '#374151', marginBottom: '0.5rem' }}>
+            <strong>Debug Information:</strong>
+          </p>
+          <p style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'monospace' }}>
+            Token in URL: {hasToken ? 'Yes' : 'No'}<br/>
+            Device ID in URL: {hasDeviceId ? 'Yes' : 'No'}<br/>
+            Loading: {isLoading ? 'Yes' : 'No'}<br/>
+            User: {user ? user.username : 'Not loaded'}<br/>
+            Role: {user?.role || 'Not set'}
+          </p>
+        </div>
+        <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '1rem' }}>
+          Please close this window and try opening the dashboard again from the browser application.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>

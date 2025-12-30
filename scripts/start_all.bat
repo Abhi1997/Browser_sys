@@ -1,0 +1,9 @@
+@echo off
+echo Starting EduBrowser System...
+echo.
+echo Starting API Server on port 5000...
+start "API Server" cmd /k "python api_server.py"
+timeout /t 3 /nobreak > nul
+echo.
+echo Starting Browser Application...
+python main.py
