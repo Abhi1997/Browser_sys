@@ -30,33 +30,40 @@ export function ExportButton({ disabled = false }: ExportButtonProps) {
   const handleExport = async () => {
     setIsExporting(true);
     
-    // Simulate export process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Create mock download
-    const exportData = {
-      exportedAt: new Date().toISOString(),
-      options: exportOptions,
-      message: 'Database export completed successfully',
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `database-export-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    setIsExporting(false);
-    setIsDialogOpen(false);
-    
-    toast({
-      title: 'Export complete',
-      description: 'Database snapshot has been downloaded.',
-    });
+    try {
+      // Call the actual export API endpoint
+      const { exportDatabase } = await import('@/lib/api');
+      const response = await exportDatabase();
+      
+      if (response.success && response.data) {
+        // Create blob from API response
+        const blob = response.data;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `database-export-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: 'Export complete',
+          description: 'Database snapshot has been downloaded.',
+        });
+      } else {
+        throw new Error(response.error || 'Export failed');
+      }
+    } catch (error) {
+      toast({
+        title: 'Export failed',
+        description: error instanceof Error ? error.message : 'Failed to export database',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+      setIsDialogOpen(false);
+    }
   };
 
   if (disabled) {

@@ -46,18 +46,52 @@ export function isTokenExpired(token: string): boolean {
 }
 
 export function extractUserFromToken(token: string): User | null {
-  const payload = parseJWT(token);
-  if (!payload) return null;
-  
-  return {
-    id: payload.userId,
-    username: payload.username,
-    role: payload.role,
-    adminId: payload.adminId,
-    email: '', // Not in token for security
-    isActive: true,
-    createdAt: new Date().toISOString(),
-  };
+  try {
+    const payload = parseJWT(token);
+    if (!payload) {
+      return null;
+    }
+    
+    // Handle both snake_case (Python) and camelCase (TypeScript) token formats
+    const userId = (payload as any).userId || (payload as any).user_id;
+    const username = payload.username;
+    let role = payload.role;
+    
+    if (!userId || !username || !role) {
+      return null;
+    }
+    
+    // Normalize role format: convert "superadmin" to "super-admin" if needed
+    if (role === 'superadmin') {
+      role = 'super-admin';
+    }
+    
+    // Ensure role is valid (case-insensitive check)
+    const validRoles: UserRole[] = ['super-admin', 'admin', 'teacher', 'student'];
+    const normalizedRole = role.toLowerCase().trim();
+    const matchedRole = validRoles.find(r => r === normalizedRole);
+    
+    if (!matchedRole) {
+      // Log to console for debugging (if available)
+      if (typeof console !== 'undefined' && console.error) {
+        console.error('Invalid role in token:', role, 'Expected one of:', validRoles);
+      }
+      return null;
+    }
+    
+    return {
+      id: String(userId), // Convert to string
+      username: String(username),
+      role: matchedRole as UserRole,
+      adminId: payload.adminId,
+      email: '', // Not in token for security
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    // If parsing fails, return null
+    return null;
+  }
 }
 
 export function getQueryParams(): { user?: string; token?: string; deviceId?: string; role?: UserRole } {

@@ -2,7 +2,8 @@ import os
 import sys
 from PyQt6.QtCore import Qt, QCoreApplication
 from PyQt6.QtWidgets import QApplication
-from browser import MainWindow, LoginWindow
+from browser import MainWindow
+from gmail_oauth import GmailLoginWindow
 
 def main():
     # macOS stability flags
@@ -20,7 +21,7 @@ def main():
 
     app = QApplication(sys.argv)
 
-    login_window = LoginWindow()
+    login_window = GmailLoginWindow()
     login_window.exec()
 
     if getattr(login_window, "login_successful", False):
@@ -29,6 +30,7 @@ def main():
             user_role=getattr(login_window, "user_role", None),
             username=getattr(login_window, "username", None),
             user_id=getattr(login_window, "user_id", None),
+            gmail=getattr(login_window, "gmail", None),
         )
         window.show()
         sys.exit(app.exec())

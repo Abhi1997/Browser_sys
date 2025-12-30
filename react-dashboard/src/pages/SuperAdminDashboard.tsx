@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { DashboardLayout } from '@/components/layouts/DashboardLayout';
 import { GlobalStatsCards } from '@/components/super/GlobalStatsCards';
 import { AdminStatsTable } from '@/components/super/AdminStatsTable';
@@ -9,14 +9,27 @@ import { UserTable } from '@/components/admin/UserTable';
 import { ListTable } from '@/components/admin/ListTable';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
-import { Eye, AlertTriangle } from 'lucide-react';
-import { mockAdminStats } from '@/lib/mock-data';
+import { Eye } from 'lucide-react';
+import { useUsers, useStats } from '@/hooks/useDashboardData';
 
 export default function SuperAdminDashboard() {
   const { selectedAdminId } = useAuth();
-  const selectedAdmin = selectedAdminId 
-    ? mockAdminStats.find(a => a.adminId === selectedAdminId)
-    : null;
+  const { data: users } = useUsers();
+  const { data: stats } = useStats();
+
+  const selectedAdmin = useMemo(() => {
+    if (!selectedAdminId || selectedAdminId === 'system') {
+      return {
+        adminId: 'system',
+        adminName: 'System Overview',
+        totalUsers: stats?.totalUsers || 0,
+        activeUsers: stats?.activeUsers || 0,
+        teachers: stats?.usersByRole?.teacher || 0,
+        students: stats?.usersByRole?.student || 0,
+      };
+    }
+    return null;
+  }, [selectedAdminId, users, stats]);
 
   return (
     <DashboardLayout title="Super Admin Dashboard">

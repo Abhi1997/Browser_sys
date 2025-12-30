@@ -12,7 +12,7 @@ import {
 } from './types';
 import { getStoredToken, getDeviceId } from './auth';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 async function apiRequest<T>(
   endpoint: string,
@@ -58,7 +58,17 @@ async function apiRequest<T>(
 
 // Auth endpoints
 export async function verifyToken(): Promise<ApiResponse<{ valid: boolean; user: User }>> {
-  return apiRequest('/auth/verify');
+  const token = getStoredToken();
+  const deviceId = getDeviceId();
+  
+  if (!token || !deviceId) {
+    return { success: false, error: 'Missing token or deviceId' };
+  }
+  
+  return apiRequest('/api/auth/verify-token', {
+    method: 'POST',
+    body: JSON.stringify({ token, deviceId }),
+  });
 }
 
 export async function login(
@@ -74,7 +84,29 @@ export async function login(
 
 // Stats endpoints
 export async function getStatsOverview(): Promise<ApiResponse<StatsOverview>> {
-  return apiRequest('/stats/overview');
+  const response = await apiRequest('/api/stats');
+  if (response.success && response.data) {
+    // Transform API response to match StatsOverview interface
+    const data = response.data as any;
+    return {
+      success: true,
+      data: {
+        totalUsers: data.totalUsers || 0,
+        activeUsers: data.activeUsers || 0,
+        activeSessions: 0, // Not tracked yet
+        usersByRole: {
+          admin: data.roleDistribution?.admin || 0,
+          teacher: data.roleDistribution?.teacher || 0,
+          student: data.roleDistribution?.student || 0,
+        },
+        whitelistSize: data.whitelistSize || 0,
+        blacklistSize: data.blacklistSize || 0,
+        recentLogins: data.recentLogins || 0,
+        recentChanges: 0, // Not tracked yet
+      },
+    };
+  }
+  return response as ApiResponse<StatsOverview>;
 }
 
 export async function getAdminStats(adminId: string): Promise<ApiResponse<AdminStats>> {
@@ -91,78 +123,95 @@ export async function getAllAdminStats(): Promise<ApiResponse<AdminStats[]>> {
 
 // User endpoints
 export async function getUsers(adminId?: string): Promise<ApiResponse<User[]>> {
-  const query = adminId ? `?adminId=${adminId}` : '';
-  return apiRequest(`/users${query}`);
+  const response = await apiRequest('/api/users');
+  if (response.success && response.data) {
+    // Transform API response to match User interface
+    const users = (response.data as any[]).map((u: any) => ({
+      id: String(u.id),
+      username: u.username,
+      email: u.gmail || u.email || '',
+      role: u.role === 'superadmin' ? 'super-admin' : u.role,
+      isActive: u.isActive,
+      createdAt: u.createdAt || u.created_at,
+      lastLogin: u.lastLogin || u.last_login,
+    }));
+    return { success: true, data: users };
+  }
+  return response as ApiResponse<User[]>;
 }
 
 export async function createUser(user: Partial<User>): Promise<ApiResponse<User>> {
-  return apiRequest('/users', {
+  return apiRequest('/api/users', {
     method: 'POST',
     body: JSON.stringify(user),
   });
 }
 
 export async function updateUser(id: string, updates: Partial<User>): Promise<ApiResponse<User>> {
-  return apiRequest(`/users/${id}`, {
+  return apiRequest(`/api/users/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
 }
 
+export async function deleteUser(id: string): Promise<ApiResponse<void>> {
+  return apiRequest(`/api/users/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function toggleUserStatus(id: string): Promise<ApiResponse<User>> {
-  return apiRequest(`/users/${id}/toggle-status`, {
+  return apiRequest(`/api/users/${id}/toggle-status`, {
     method: 'PATCH',
   });
 }
 
 // Whitelist endpoints
 export async function getWhitelist(adminId?: string): Promise<ApiResponse<WhitelistEntry[]>> {
-  const query = adminId ? `?adminId=${adminId}` : '';
-  return apiRequest(`/whitelist${query}`);
+  return apiRequest('/api/whitelist');
 }
 
 export async function addToWhitelist(entry: Partial<WhitelistEntry>): Promise<ApiResponse<WhitelistEntry>> {
-  return apiRequest('/whitelist', {
+  return apiRequest('/api/whitelist', {
     method: 'POST',
     body: JSON.stringify(entry),
   });
 }
 
 export async function updateWhitelistEntry(id: string, updates: Partial<WhitelistEntry>): Promise<ApiResponse<WhitelistEntry>> {
-  return apiRequest(`/whitelist/${id}`, {
+  return apiRequest(`/api/whitelist/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
 }
 
 export async function removeFromWhitelist(id: string): Promise<ApiResponse<void>> {
-  return apiRequest(`/whitelist/${id}`, {
+  return apiRequest(`/api/whitelist/${id}`, {
     method: 'DELETE',
   });
 }
 
 // Blacklist endpoints
 export async function getBlacklist(adminId?: string): Promise<ApiResponse<BlacklistEntry[]>> {
-  const query = adminId ? `?adminId=${adminId}` : '';
-  return apiRequest(`/blacklist${query}`);
+  return apiRequest('/api/blacklist');
 }
 
 export async function addToBlacklist(entry: Partial<BlacklistEntry>): Promise<ApiResponse<BlacklistEntry>> {
-  return apiRequest('/blacklist', {
+  return apiRequest('/api/blacklist', {
     method: 'POST',
     body: JSON.stringify(entry),
   });
 }
 
 export async function updateBlacklistEntry(id: string, updates: Partial<BlacklistEntry>): Promise<ApiResponse<BlacklistEntry>> {
-  return apiRequest(`/blacklist/${id}`, {
+  return apiRequest(`/api/blacklist/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
 }
 
 export async function removeFromBlacklist(id: string): Promise<ApiResponse<void>> {
-  return apiRequest(`/blacklist/${id}`, {
+  return apiRequest(`/api/blacklist/${id}`, {
     method: 'DELETE',
   });
 }
@@ -213,11 +262,62 @@ export async function markNotificationRead(id: string): Promise<ApiResponse<void
   });
 }
 
+// Student endpoints
+export async function getStudents(): Promise<ApiResponse<any[]>> {
+  return apiRequest('/api/students');
+}
+
+export async function setStudentMode(studentId: string, mode: string, changedBy: number): Promise<ApiResponse<any>> {
+  return apiRequest(`/api/students/${studentId}/mode`, {
+    method: 'POST',
+    body: JSON.stringify({ mode, changedBy }),
+  });
+}
+
+// Activity endpoints
+export async function getActivity(studentId?: string, limit: number = 100): Promise<ApiResponse<any[]>> {
+  const query = studentId ? `?studentId=${studentId}&limit=${limit}` : `?limit=${limit}`;
+  return apiRequest(`/api/activity${query}`);
+}
+
+export async function getViolations(studentId?: string, limit: number = 100): Promise<ApiResponse<any[]>> {
+  const query = studentId ? `?studentId=${studentId}&limit=${limit}` : `?limit=${limit}`;
+  return apiRequest(`/api/violations${query}`);
+}
+
 // Teacher endpoints
 export async function getClassMetrics(): Promise<ApiResponse<ClassMetrics[]>> {
-  return apiRequest('/teacher/classes');
+  // Transform students data to class metrics
+  const studentsResponse = await getStudents();
+  if (studentsResponse.success && studentsResponse.data) {
+    const students = studentsResponse.data as any[];
+    // Group by mode or create default class
+    const metrics: ClassMetrics[] = [
+      {
+        classId: 'all',
+        className: 'All Students',
+        studentCount: students.length,
+        averageActivity: 75, // TODO: Calculate from activity logs
+        completedLessons: 0,
+        totalLessons: 0,
+      },
+    ];
+    return { success: true, data: metrics };
+  }
+  return { success: false, error: 'Failed to fetch class metrics' };
 }
 
 export async function getClassActivity(classId: string, hours: number = 24): Promise<ApiResponse<ActivityData[]>> {
-  return apiRequest(`/teacher/classes/${classId}/activity?hours=${hours}`);
+  const response = await getActivity(undefined, 100);
+  if (response.success && response.data) {
+    // Transform activity logs to ActivityData format
+    const activities = (response.data as any[]).map((a: any) => ({
+      timestamp: a.visitStart || a.createdAt,
+      activeStudents: 1,
+      pageViews: 1,
+      interactions: 0,
+    }));
+    return { success: true, data: activities };
+  }
+  return response as ApiResponse<ActivityData[]>;
 }

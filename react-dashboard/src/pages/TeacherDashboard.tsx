@@ -3,17 +3,23 @@ import { DashboardLayout } from '@/components/layouts/DashboardLayout';
 import { ClassStatsCards } from '@/components/teacher/ClassStatsCards';
 import { ActivityTimelineChart } from '@/components/charts/ActivityTimelineChart';
 import { StatCard } from '@/components/shared/StatCard';
-import { Users, BookOpen, TrendingUp, Clock } from 'lucide-react';
+import { StudentTable } from '@/components/admin/StudentTable';
+import { ViolationsTable } from '@/components/admin/ViolationsTable';
+import { Users, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { mockClassMetrics } from '@/lib/mock-data';
+import { useStudents, useViolations, useActivity } from '@/hooks/useDashboardData';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function TeacherDashboard() {
-  const totalStudents = mockClassMetrics.reduce((sum, c) => sum + c.studentCount, 0);
-  const avgActivity = Math.round(
-    mockClassMetrics.reduce((sum, c) => sum + c.averageActivity, 0) / mockClassMetrics.length
-  );
-  const totalLessons = mockClassMetrics.reduce((sum, c) => sum + c.completedLessons, 0);
-  const totalPlanned = mockClassMetrics.reduce((sum, c) => sum + c.totalLessons, 0);
+  const { data: students, isLoading: studentsLoading } = useStudents();
+  const { data: violations } = useViolations(undefined, 20);
+  const { data: activity } = useActivity(undefined, 50);
+
+  const totalStudents = students?.length || 0;
+  const activeStudents = students?.filter((s: any) => s.isActive).length || 0;
+  const recentViolations = violations?.length || 0;
+  const recentActivity = activity?.length || 0;
 
   return (
     <DashboardLayout title="Teacher Dashboard">
@@ -26,48 +32,75 @@ export default function TeacherDashboard() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          title="Total Students"
-          value={totalStudents}
-          icon={Users}
-          iconColor="text-primary"
-          delay={0}
-        />
-        <StatCard
-          title="Classes"
-          value={mockClassMetrics.length}
-          icon={BookOpen}
-          iconColor="text-success"
-          delay={100}
-        />
-        <StatCard
-          title="Avg. Activity"
-          value={`${avgActivity}%`}
-          change={{ value: 5, type: 'increase' }}
-          icon={TrendingUp}
-          iconColor="text-accent"
-          delay={200}
-        />
-        <StatCard
-          title="Lessons Done"
-          value={`${totalLessons}/${totalPlanned}`}
-          icon={Clock}
-          iconColor="text-warning"
-          delay={300}
-        />
+        {studentsLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))
+        ) : (
+          <>
+            <StatCard
+              title="Total Students"
+              value={totalStudents}
+              icon={Users}
+              iconColor="text-primary"
+              delay={0}
+            />
+            <StatCard
+              title="Active Students"
+              value={activeStudents}
+              icon={Users}
+              iconColor="text-success"
+              delay={100}
+            />
+            <StatCard
+              title="Recent Activity"
+              value={recentActivity}
+              icon={TrendingUp}
+              iconColor="text-accent"
+              delay={200}
+            />
+            <StatCard
+              title="Violations"
+              value={recentViolations}
+              icon={AlertTriangle}
+              iconColor="text-warning"
+              delay={300}
+            />
+          </>
+        )}
       </div>
 
-      {/* Class Cards */}
+      {/* Class Stats */}
       <div className="mb-8">
-        <div className="mb-4">
-          <h2 className="text-xl font-semibold text-foreground">Your Classes</h2>
-          <p className="text-sm text-muted-foreground">Class performance and metrics</p>
-        </div>
         <ClassStatsCards />
       </div>
 
-      {/* Activity Chart */}
-      <ActivityTimelineChart />
+      {/* Tabs for student management */}
+      <Tabs defaultValue="students" className="space-y-6">
+        <TabsList className="glass-card p-1">
+          <TabsTrigger value="students" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            Students
+          </TabsTrigger>
+          <TabsTrigger value="violations" className="data-[state=active]:bg-warning data-[state=active]:text-warning-foreground">
+            Violations
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
+            Activity
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="students" className="animate-fade-in">
+          <StudentTable />
+        </TabsContent>
+
+        <TabsContent value="violations" className="animate-fade-in">
+          <ViolationsTable />
+        </TabsContent>
+
+        <TabsContent value="activity" className="animate-fade-in">
+          <ActivityTimelineChart />
+        </TabsContent>
+      </Tabs>
     </DashboardLayout>
   );
 }

@@ -1,9 +1,9 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { mockStatsOverview } from '@/lib/mock-data';
+import { useStats } from '@/hooks/useDashboardData';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface RoleDistributionChartProps {
-  data?: typeof mockStatsOverview.usersByRole;
   className?: string;
 }
 
@@ -14,14 +14,26 @@ const COLORS = [
 ];
 
 export function RoleDistributionChart({ 
-  data = mockStatsOverview.usersByRole, 
   className 
 }: RoleDistributionChartProps) {
-  const chartData = [
-    { name: 'Admins', value: data.admin, color: COLORS[0] },
-    { name: 'Teachers', value: data.teacher, color: COLORS[1] },
-    { name: 'Students', value: data.student, color: COLORS[2] },
-  ];
+  const { data: stats, isLoading } = useStats();
+  
+  const chartData = stats?.usersByRole ? [
+    { name: 'Admins', value: stats.usersByRole.admin, color: COLORS[0] },
+    { name: 'Teachers', value: stats.usersByRole.teacher, color: COLORS[1] },
+    { name: 'Students', value: stats.usersByRole.student, color: COLORS[2] },
+  ] : [];
+
+  if (isLoading) {
+    return (
+      <div className={className}>
+        <div className="glass-card p-6">
+          <Skeleton className="h-8 w-48 mb-6" />
+          <Skeleton className="h-[300px] w-full" />
+        </div>
+      </div>
+    );
+  }
 
   const total = chartData.reduce((sum, item) => sum + item.value, 0);
 

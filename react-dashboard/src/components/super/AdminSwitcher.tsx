@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Check, ChevronDown, Building2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,13 +11,40 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockAdminStats } from '@/lib/mock-data';
+import { useUsers } from '@/hooks/useDashboardData';
+import { AdminStats } from '@/lib/types';
 
 export function AdminSwitcher() {
   const { selectedAdminId, setSelectedAdminId } = useAuth();
+  const { data: users } = useUsers();
+
+  const adminStats = useMemo((): AdminStats[] => {
+    if (!users) return [];
+
+    // Group by admin (for now, we'll create a single "institution" from all admins)
+    const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super-admin');
+    
+    if (adminUsers.length === 0) return [];
+
+    // Create a single admin stat entry representing the system
+    const activeUsers = users.filter((u: any) => u.isActive);
+    const teacherUsers = users.filter((u: any) => u.role === 'teacher');
+    const studentUsers = users.filter((u: any) => u.role === 'student');
+
+    return [{
+      id: 'system',
+      adminId: 'system',
+      adminName: 'System Overview',
+      totalUsers: users.length,
+      activeUsers: activeUsers.length,
+      teachers: teacherUsers.length,
+      students: studentUsers.length,
+      activeSessions: 0,
+    }];
+  }, [users]);
   
   const selectedAdmin = selectedAdminId 
-    ? mockAdminStats.find(a => a.adminId === selectedAdminId)
+    ? adminStats.find(a => a.adminId === selectedAdminId)
     : null;
 
   return (
@@ -67,7 +94,7 @@ export function AdminSwitcher() {
           Institutions
         </DropdownMenuLabel>
         
-        {mockAdminStats.map((admin) => (
+        {adminStats.map((admin) => (
           <DropdownMenuItem
             key={admin.adminId}
             onClick={() => setSelectedAdminId(admin.adminId)}

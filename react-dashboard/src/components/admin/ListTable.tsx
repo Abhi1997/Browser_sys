@@ -20,10 +20,20 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { mockWhitelist, mockBlacklist } from '@/lib/mock-data';
 import { WhitelistEntry, BlacklistEntry } from '@/lib/types';
-import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  useWhitelist,
+  useBlacklist,
+  useAddToWhitelist,
+  useAddToBlacklist,
+  useRemoveFromWhitelist,
+  useRemoveFromBlacklist,
+  useUpdateWhitelistEntry,
+  useUpdateBlacklistEntry,
+} from '@/hooks/useDashboardData';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ListTableProps {
   type: 'whitelist' | 'blacklist';
@@ -31,56 +41,75 @@ interface ListTableProps {
 }
 
 export function ListTable({ type, readOnly = false }: ListTableProps) {
-  const [items, setItems] = useState(
-    type === 'whitelist' ? mockWhitelist : mockBlacklist
-  );
+  const isWhitelist = type === 'whitelist';
+  const { user } = useAuth();
+  const { data: whitelist, isLoading: whitelistLoading } = useWhitelist();
+  const { data: blacklist, isLoading: blacklistLoading } = useBlacklist();
+  const items = isWhitelist ? whitelist : blacklist;
+  const isLoading = isWhitelist ? whitelistLoading : blacklistLoading;
+  
+  const addToWhitelist = useAddToWhitelist();
+  const addToBlacklist = useAddToBlacklist();
+  const removeFromWhitelist = useRemoveFromWhitelist();
+  const removeFromBlacklist = useRemoveFromBlacklist();
+  const updateWhitelistEntry = useUpdateWhitelistEntry();
+  const updateBlacklistEntry = useUpdateBlacklistEntry();
+  
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newUrl, setNewUrl] = useState('');
   const [newDescription, setNewDescription] = useState('');
 
-  const isWhitelist = type === 'whitelist';
-
   const handleToggleStatus = (itemId: string) => {
-    setItems(prev => prev.map(item => 
-      item.id === itemId ? { ...item, isActive: !item.isActive } : item
-    ));
-    toast({
-      title: 'Entry updated',
-      description: 'The entry status has been changed.',
-    });
+    const item = items?.find((i: any) => i.id === itemId);
+    if (!item) return;
+    
+    const updates = { isActive: !item.isActive };
+    if (isWhitelist) {
+      updateWhitelistEntry.mutate({ id: itemId, updates });
+    } else {
+      updateBlacklistEntry.mutate({ id: itemId, updates });
+    }
   };
 
   const handleDelete = (itemId: string) => {
-    setItems(prev => prev.filter(item => item.id !== itemId));
-    toast({
-      title: 'Entry removed',
-      description: `URL removed from ${type}.`,
-      variant: 'destructive',
-    });
+    if (isWhitelist) {
+      removeFromWhitelist.mutate(itemId);
+    } else {
+      removeFromBlacklist.mutate(itemId);
+    }
   };
 
   const handleAdd = () => {
     if (!newUrl.trim()) return;
     
-    const newItem = {
-      id: Date.now().toString(),
-      url: newUrl,
-      [isWhitelist ? 'description' : 'reason']: newDescription,
-      addedBy: 'admin',
-      addedAt: new Date().toISOString(),
-      isActive: true,
+    const entry: any = {
+      domain: newUrl.trim(),
+      url: newUrl.trim(),
+      mode: 'free',
+      addedBy: user?.id || '1',  // Use current user ID or default to admin
     };
     
-    setItems(prev => [newItem as any, ...prev]);
+    if (isWhitelist) {
+      entry.description = newDescription.trim();
+      addToWhitelist.mutate(entry);
+    } else {
+      entry.reason = newDescription.trim();
+      addToBlacklist.mutate(entry);
+    }
+    
     setNewUrl('');
     setNewDescription('');
     setIsAddDialogOpen(false);
-    
-    toast({
-      title: 'Entry added',
-      description: `URL added to ${type}.`,
-    });
   };
+
+  if (isLoading) {
+    return (
+      <div className="glass-card p-6">
+        <Skeleton className="h-8 w-48 mb-4" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   const columns = [
     {
@@ -205,7 +234,7 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
           )}
         </div>
         <DataTable
-          data={items}
+          data={items || []}
           columns={columns as any}
           emptyMessage={`No URLs in ${type}`}
         />

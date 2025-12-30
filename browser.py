@@ -1,29 +1,27 @@
 import sys
-from PyQt6.QtCore import QUrl, QSize, Qt
+from datetime import datetime
+from PyQt6.QtCore import QUrl, QSize, Qt, QTimer
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QPushButton, QLineEdit, 
-    QTabWidget, QApplication, QToolBar, QStatusBar, QComboBox, QMessageBox,QDialog,QStyle
+    QTabWidget, QApplication, QToolBar, QStatusBar, QComboBox, 
+    QMessageBox, QDialog, QStyle, QHBoxLayout, QLabel, QProgressBar
 )
-from PyQt6.QtGui import QAction, QIcon
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtCore import QUrl, QSize, Qt
-from PyQt6.QtWidgets import (
-    QMainWindow,QInputDialog, QWidget, QVBoxLayout, QLineEdit,QLabel,QLineEdit,QPushButton,QMessageBox,
-    QTabWidget, QToolBar, QStatusBar, QComboBox
-)
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QIcon, QColor, QPalette
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
 from authentication import Authentication
+from mode_enforcement import ModeEnforcement
+from gmail_oauth import GmailLoginWindow
 from admin_dashboard import AdminDashboard, DashboardWindow
 from admin_dashboard import AdminDashboard, TeacherDashboard, SuperAdminDashboard, DashboardWindow
 
 
 class BrowserTab(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, mode_enforcer=None, student_id=None):
         super().__init__(parent)
-
-
+        self.mode_enforcer = mode_enforcer
+        self.student_id = student_id
+        self.visit_start = None
 
         # specific profile setup can be done here, using default for now
         self.profile = QWebEngineProfile.defaultProfile()
@@ -39,6 +37,7 @@ class BrowserTab(QWidget):
         self.view.urlChanged.connect(self.on_url_changed)
         self.view.titleChanged.connect(self.on_title_changed)
         self.view.loadFinished.connect(self.on_load_finished)
+        self.view.loadStarted.connect(self.on_load_started)
 
     def on_url_changed(self, qurl: QUrl):
         # Notify the main window to update the URL bar
@@ -60,6 +59,10 @@ class BrowserTab(QWidget):
             if idx >= 0:
                 parent.setTabText(idx, title[:20] + "..." if len(title) > 20 else title)
 
+    def on_load_started(self):
+        """Track when page load starts"""
+        self.visit_start = datetime.now()
+    
     def on_load_finished(self, ok: bool):
         # Update status bar via Main Window
         parent = self.parent()
@@ -72,77 +75,86 @@ class BrowserTab(QWidget):
             if MainWindow and isinstance(mw, MainWindow):
                 if ok:
                     mw.status.showMessage(f"Loaded: {self.view.title()}")
+                    # Log activity if student
+                    if self.student_id and self.visit_start:
+                        duration = (datetime.now() - self.visit_start).seconds
+                        url = self.view.url().toString()
+                        if mw.current_mode and mw.user_id:
+                            self.mode_enforcer.log_activity(
+                                self.student_id, mw.user_id, url, 
+                                mw.current_mode, duration
+                            )
                 else:
                     mw.status.showMessage("Failed to load page")
 
 
 
-class LoginWindow(QDialog):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Login")
-        self.setFixedSize(300, 150)
+# LoginWindow is now in gmail_oauth.py - keeping for backward compatibility
+LoginWindow = GmailLoginWindow
 
-        # Layout
-        layout = QVBoxLayout()
+class LoadingScreen(QWidget):
+    """Loading screen shown after login"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.label = QLabel("Loading Secure Browser...")
+        self.label.setStyleSheet("font-size: 18px; color: #1f2937;")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label)
+        
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)  # Indeterminate
+        self.progress.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #e5e7eb;
+                border-radius: 5px;
+                text-align: center;
+                height: 20px;
+            }
+            QProgressBar::chunk {
+                background-color: #3b82f6;
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(self.progress)
 
-        # Username field
-        self.username_label = QLabel("Username:")
-        self.username_input = QLineEdit()
-        layout.addWidget(self.username_label)
-        layout.addWidget(self.username_input)
-
-        # Password field
-        self.password_label = QLabel("Password:")
-        self.password_input = QLineEdit()
-        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        layout.addWidget(self.password_label)
-        layout.addWidget(self.password_input)
-
-        # Login button
-        self.login_button = QPushButton("Login")
-        self.login_button.clicked.connect(self.handle_login)
-        layout.addWidget(self.login_button)
-
-        self.setLayout(layout)
-
-        # Authentication instance
-        self.auth = Authentication(host="localhost", user="root", password="Innovation", database="edubrowser")
-
-        # Login status
-        self.login_successful = False
-
-    def handle_login(self):
-        username = self.username_input.text().strip()
-        password = self.password_input.text().strip()
-
-        if not username or not password:
-            QMessageBox.warning(self, "Login Failed", "Please enter both username and password.")
-            return
-
-        result = self.auth.validate_user_with_id(username, password)
-        if result:
-            role, user_id = result
-            QMessageBox.information(self, "Login Successful", f"Welcome, {username}! Role: {role}")
-            self.login_successful = True
-            self.user_role = role
-            self.username = username
-            self.user_id = user_id
-            self.close()  # Close the login window
-        else:
-            QMessageBox.warning(self, "Login Failed", "Invalid username or password. Please try again.")
 
 class MainWindow(QMainWindow):
-    def __init__(self, auth=None, user_role=None, username=None, user_id=None):
+    def __init__(self, auth=None, user_role=None, username=None, user_id=None, gmail=None):
         super().__init__()
-        self.setWindowTitle("Simple Python Browser")
+        self.setWindowTitle("Secure Academic Browser")
         self.resize(1200, 800)
 
-        self.auth = auth or Authentication(host="localhost", user="root", password="Innovation", database="edubrowser")
+        self.auth = auth or Authentication(
+            host="localhost", user="root", password="Innovation", 
+            database="edubrowser"
+        )
         self.user_role = user_role
         self.username = username
         self.user_id = user_id
+        self.gmail = gmail
+        
+        # Mode enforcement
+        self.mode_enforcer = ModeEnforcement(self.auth)
+        self.current_mode = None
+        self.student_id = None
+        
+        # Get student mode if student
+        if self.user_role == "student":
+            self.current_mode = self.auth.get_student_mode(self.user_id)
+            self.student_id = self.username  # Use username as student_id
+        
+        # Show loading screen
+        self.loading_screen = LoadingScreen(self)
+        self.setCentralWidget(self.loading_screen)
+        
+        # Setup UI after delay (simulate loading)
+        QTimer.singleShot(1500, self.finish_loading)
 
+    def finish_loading(self):
+        """Complete loading and show browser UI"""
         # Tab Widget
         self.tabs = QTabWidget(movable=True, tabsClosable=True)
         self.tabs.tabCloseRequested.connect(self.close_tab)
@@ -163,9 +175,11 @@ class MainWindow(QMainWindow):
         # Setup UI Components
         self.setup_toolbar()
         self.setup_menu()
+        self.setup_mode_indicators()
 
         self.status = QStatusBar()
         self.setStatusBar(self.status)
+        self.update_security_status()
 
         # Open initial tab
         self.add_tab()
@@ -216,11 +230,44 @@ class MainWindow(QMainWindow):
         toolbar.addAction(new_tab_action)
 
         # Dashboard (roles: admin/super-admin/teacher)
-        if self.user_role in ("admin", "super-admin", "teacher"):
+        if self.user_role in ("admin", "superadmin", "teacher"):
             dash_action = QAction(style.standardIcon(QStyle.StandardPixmap.SP_ComputerIcon), "", self)
             dash_action.setToolTip("Dashboard")
             dash_action.triggered.connect(self.open_dashboard)
             toolbar.addAction(dash_action)
+    
+    def setup_mode_indicators(self):
+        """Setup mode indicator buttons (for students)"""
+        if self.user_role != "student" or not self.current_mode:
+            return
+        
+        mode_toolbar = QToolBar("Mode Indicator")
+        mode_toolbar.setMovable(False)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, mode_toolbar)
+        
+        mode_info = self.mode_enforcer.get_mode_info(self.current_mode)
+        
+        # Mode label
+        mode_label = QLabel(f"{mode_info['icon']} {mode_info['name']}")
+        mode_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {mode_info['color']};
+                color: white;
+                padding: 8px 15px;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 12px;
+            }}
+        """)
+        mode_label.setToolTip(mode_info['description'])
+        mode_toolbar.addWidget(mode_label)
+        
+        mode_toolbar.addSeparator()
+        
+        # Info label
+        info_label = QLabel("Mode cannot be changed by student")
+        info_label.setStyleSheet("color: #6b7280; font-size: 11px; padding: 5px;")
+        mode_toolbar.addWidget(info_label)
 
     def setup_menu(self):
         menubar = self.menuBar()
@@ -252,7 +299,7 @@ class MainWindow(QMainWindow):
         return None
 
     def add_tab(self):
-        tab = BrowserTab(self)
+        tab = BrowserTab(self, mode_enforcer=self.mode_enforcer, student_id=self.student_id)
         idx = self.tabs.addTab(tab, "New Tab")
         self.tabs.setCurrentIndex(idx)
         self.url_bar.setFocus()
@@ -287,9 +334,43 @@ class MainWindow(QMainWindow):
         elif not url_text.startswith("http://") and not url_text.startswith("https://"):
             url_text = "https://" + url_text
 
+        # Mode enforcement for students
+        if self.user_role == "student" and self.current_mode:
+            is_allowed, reason = self.mode_enforcer.is_url_allowed(
+                url_text, self.current_mode, self.student_id
+            )
+            
+            if not is_allowed:
+                self.show_bypass_warning(url_text, reason)
+                return
+        
         self.current_view().setUrl(QUrl(url_text))
+    
+    def show_bypass_warning(self, url, reason):
+        """Show security-themed warning for blocked URLs"""
+        msg = QMessageBox(self)
+        msg.setWindowTitle("⚠️ Security Alert - Access Denied")
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.setText("🚫 UNAUTHORIZED ACCESS ATTEMPT DETECTED")
+        msg.setInformativeText(
+            f"<b>URL Blocked:</b> {url}<br><br>"
+            f"<b>Reason:</b> {reason}<br><br>"
+            f"<b>Mode:</b> {self.mode_enforcer.get_mode_info(self.current_mode)['name']}<br><br>"
+            f"<font color='red'><b>⚠️ This violation has been logged.</b></font><br>"
+            f"Repeated violations may result in disciplinary action."
+        )
+        msg.setStyleSheet("""
+            QMessageBox {
+                background-color: #ffffff;
+            }
+            QMessageBox QLabel {
+                color: #1f2937;
+                font-size: 12px;
+            }
+        """)
+        msg.exec()
     def prompt_login(self):
-        auth = Authentication(host="localhost", user="root", password="your_password", database="edubrowser")
+        auth = Authentication(host="localhost", user="root", password="Innovation")
         while True:
             username, ok = QInputDialog.getText(self, "Login", "Username:")
             if not ok:
@@ -318,27 +399,60 @@ class MainWindow(QMainWindow):
         dlg = AdminDashboard(self, auth=self.auth)
         dlg.exec()
 
+    def update_security_status(self):
+        """Update security status indicator in status bar"""
+        if self.user_role == "student" and self.current_mode:
+            mode_info = self.mode_enforcer.get_mode_info(self.current_mode)
+            self.status.showMessage(
+                f"🔒 Security Mode: {mode_info['name']} | "
+                f"User: {self.username} | "
+                f"Role: {self.user_role.capitalize()}"
+            )
+        else:
+            self.status.showMessage(
+                f"User: {self.username} | Role: {self.user_role.capitalize()}"
+            )
+    
     def open_dashboard(self):
         if self.user_role in ("admin", "superadmin", "teacher"):
-            # Generate token and device ID for dashboard authentication
-            token = self.auth.generate_token(self.username, self.user_role, self.user_id)
-            device_id = self.auth.generate_device_id()
-            
-            base = "http://localhost:3000"
-            route_map = {
-                "superadmin": "#/dashboard/super-admin",
-                "admin": "#/dashboard/admin",
-                "teacher": "#/dashboard/teacher",
-            }
-            path = route_map.get(self.user_role, "#/dashboard")
-            url = f"{base}/{path}?token={token}&deviceId={device_id}"
-            dlg = DashboardWindow(
-                self,
-                auth=self.auth,
-                role=self.user_role,
-                username=self.username,
-                react_url=url  # pass full URL
-            )
-            dlg.exec()
+            try:
+                # Get device info
+                device_info = self.auth.get_device_info()
+                device_id = device_info["device_id"]
+                
+                # Register device if not already registered
+                self.auth.register_device(self.user_id, device_info)
+                
+                # Generate token and dashboard token
+                token = self.auth.generate_token(self.username, self.user_role, self.user_id)
+                dashboard_token = self.auth.create_dashboard_token(self.user_id, device_id)
+                
+                if not dashboard_token:
+                    QMessageBox.warning(self, "Error", "Failed to create dashboard token. Please try again.")
+                    return
+                
+                base = "http://localhost:3000"
+                route_map = {
+                    "superadmin": "#/dashboard/super-admin",
+                    "admin": "#/dashboard/admin",
+                    "teacher": "#/dashboard/teacher",
+                }
+                path = route_map.get(self.user_role, "#/dashboard")
+                url = f"{base}/{path}?token={dashboard_token}&deviceId={device_id}"
+                
+                dlg = DashboardWindow(
+                    self,
+                    auth=self.auth,
+                    role=self.user_role,
+                    username=self.username,
+                    react_url=url  # pass full URL
+                )
+                dlg.exec()
+            except Exception as e:
+                error_msg = f"Failed to open dashboard:\n{str(e)}"
+                print(f"[DASHBOARD ERROR] {error_msg}")
+                import traceback
+                traceback.print_exc()
+                QMessageBox.critical(self, "Error", error_msg)
         else:
             QMessageBox.information(self, "Info", "Dashboard is not available for this role.")

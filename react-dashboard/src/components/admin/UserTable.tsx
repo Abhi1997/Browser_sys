@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { User as UserIcon, MoreHorizontal, UserX, UserCheck, Pencil, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
@@ -10,36 +10,48 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { mockUsers } from '@/lib/mock-data';
 import { User } from '@/lib/types';
 import { formatRole, getRoleBadgeClass } from '@/lib/auth';
-import { toast } from '@/hooks/use-toast';
+import { useUsers, useToggleUserStatus, useDeleteUser } from '@/hooks/useDashboardData';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface UserTableProps {
   readOnly?: boolean;
 }
 
 export function UserTable({ readOnly = false }: UserTableProps) {
-  const [users, setUsers] = useState(mockUsers);
+  const { data: users, isLoading } = useUsers();
+  const toggleStatus = useToggleUserStatus();
+  const deleteUser = useDeleteUser();
 
   const handleToggleStatus = (userId: string) => {
-    setUsers(prev => prev.map(user => 
-      user.id === userId ? { ...user, isActive: !user.isActive } : user
-    ));
-    toast({
-      title: 'User status updated',
-      description: 'The user account status has been changed.',
-    });
+    toggleStatus.mutate(userId);
   };
 
   const handleDelete = (userId: string) => {
-    setUsers(prev => prev.filter(user => user.id !== userId));
-    toast({
-      title: 'User removed',
-      description: 'The user has been removed from the system.',
-      variant: 'destructive',
-    });
+    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      deleteUser.mutate(userId);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="glass-card p-6">
+        <Skeleton className="h-8 w-48 mb-4" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!users || users.length === 0) {
+    return (
+      <div className="glass-card p-6">
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">No users found</p>
+        </div>
+      </div>
+    );
+  }
 
   const columns = [
     {

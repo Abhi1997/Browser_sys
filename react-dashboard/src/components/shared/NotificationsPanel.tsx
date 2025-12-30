@@ -3,9 +3,9 @@ import { X, AlertTriangle, Info, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { mockNotifications } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useViolations } from '@/hooks/useDashboardData';
 
 interface NotificationsPanelProps {
   isOpen: boolean;
@@ -29,6 +29,38 @@ const colorMap = {
 export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps) {
   const { role } = useAuth();
   const isReadOnly = role === 'super-admin';
+  const { data: violations } = useViolations(undefined, 10);
+
+  // Generate notifications from violations and other data
+  const notifications = React.useMemo(() => {
+    const notifs: any[] = [];
+    
+    if (violations && violations.length > 0) {
+      violations.slice(0, 5).forEach((v: any) => {
+        notifs.push({
+          id: `violation-${v.id}`,
+          type: 'warning' as const,
+          title: 'Security Violation',
+          message: `${v.violationType}: ${v.description || v.attemptedUrl || 'Unknown violation'}`,
+          timestamp: v.createdAt || new Date().toISOString(),
+          read: false,
+          actionable: true,
+        });
+      });
+    }
+
+    return notifs.length > 0 ? notifs : [
+      {
+        id: 'no-notifications',
+        type: 'info' as const,
+        title: 'All Clear',
+        message: 'No recent notifications or violations.',
+        timestamp: new Date().toISOString(),
+        read: true,
+        actionable: false,
+      }
+    ];
+  }, [violations]);
 
   if (!isOpen) return null;
 
@@ -56,7 +88,7 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
 
         <ScrollArea className="h-[calc(100%-88px)]">
           <div className="p-4 space-y-3">
-            {mockNotifications.map((notification) => {
+            {notifications.map((notification) => {
               const Icon = iconMap[notification.type];
               return (
                 <div

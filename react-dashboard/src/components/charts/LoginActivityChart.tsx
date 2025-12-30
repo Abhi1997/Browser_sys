@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   AreaChart,
   Area,
@@ -9,18 +9,47 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { mockLoginActivity } from '@/lib/mock-data';
+import { useActivity } from '@/hooks/useDashboardData';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface LoginActivityChartProps {
-  data?: typeof mockLoginActivity;
   className?: string;
 }
 
-export function LoginActivityChart({ data = mockLoginActivity, className }: LoginActivityChartProps) {
-  const formattedData = data.map(item => ({
-    ...item,
-    date: new Date(item.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-  }));
+export function LoginActivityChart({ className }: LoginActivityChartProps) {
+  const { data: activity, isLoading } = useActivity(undefined, 50);
+  
+  const formattedData = useMemo(() => {
+    if (!activity) return [];
+    
+    // Group by date
+    const grouped = activity.reduce((acc: any, item: any) => {
+      const date = new Date(item.visitStart || item.createdAt).toLocaleDateString();
+      if (!acc[date]) {
+        acc[date] = { date, logins: 0, uniqueUsers: new Set() };
+      }
+      acc[date].logins++;
+      acc[date].uniqueUsers.add(item.studentId || item.userId);
+      return acc;
+    }, {});
+    
+    return Object.values(grouped).map((item: any) => ({
+      ...item,
+      uniqueUsers: item.uniqueUsers.size,
+      date: new Date(item.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+    })).slice(-7); // Last 7 days
+  }, [activity]);
+
+  if (isLoading) {
+    return (
+      <div className={className}>
+        <div className="glass-card p-6">
+          <Skeleton className="h-8 w-48 mb-6" />
+          <Skeleton className="h-[300px] w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
@@ -31,7 +60,7 @@ export function LoginActivityChart({ data = mockLoginActivity, className }: Logi
         </div>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={formattedData}>
+            <AreaChart data={formattedData.length > 0 ? formattedData : [{ date: 'No data', logins: 0, uniqueUsers: 0 }]}>
               <defs>
                 <linearGradient id="loginGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
