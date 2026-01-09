@@ -24,7 +24,8 @@ def setup_docker_database():
             host="localhost",
             port=3307,
             user="root",
-            password="Innovation"
+            password="Innovation",
+            allow_public_key_retrieval=True  # Required for MySQL 8.0+
         )
         cursor = conn.cursor()
         

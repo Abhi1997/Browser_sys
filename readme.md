@@ -25,6 +25,7 @@ A comprehensive PyQt6-based secure academic browser system with role-based acces
 4. **Login:**
    - Username: `admin`
    - Password: `admin123!`
+   - **Note:** Admin users do NOT require approval - they can login immediately.
 
 ### Local Setup
 
@@ -70,6 +71,7 @@ Browser_sys/
 │   ├── CURSOR_PROMPT.md          # Complete project generation prompt
 │   ├── HOW_TO_RUN_WITH_DOCKER.md # Docker setup guide
 │   ├── LOGIN_GUIDE.md            # Login instructions
+│   ├── ADMIN_APPROVAL_POLICY.md  # Approval policy documentation
 │   └── ...other documentation
 │
 └── react-dashboard/        # React dashboard frontend
@@ -80,9 +82,22 @@ Browser_sys/
 
 ## 🔑 Default Credentials
 
-- **Admin:** `admin` / `admin123!`
-- **Teachers:** `teacher1`-`teacher3` / `teacher123`
-- **Students:** `student1`-`student10` / `student123`
+- **Admin:** `admin` / `admin123!` ⚠️ **No approval required**
+- **Teachers:** `teacher1`-`teacher3` / `teacher123` ⚠️ **Require admin approval**
+- **Students:** `student1`-`student10` / `student123` ⚠️ **No approval required**
+
+## 👥 User Roles & Approval
+
+| Role | Approval Required | Notes |
+|------|-------------------|-------|
+| **Admin** | ❌ NO | Can login immediately, full access |
+| **Super Admin** | ❌ NO | Can login immediately, absolute control |
+| **Student** | ❌ NO | Can login immediately, browser access only |
+| **Teacher** | ✅ YES | Must be approved by admin before login |
+
+**Important:** Only Teachers require approval. Admin, Super Admin, and Student users can login immediately without any approval workflow.
+
+See `docs/ADMIN_APPROVAL_POLICY.md` for detailed information.
 
 ## 📚 Documentation
 
@@ -91,6 +106,7 @@ See the `docs/` folder for comprehensive documentation:
 - **LOGIN_GUIDE.md** - Login instructions and credentials
 - **GOOGLE_OAUTH_SETUP.md** - Gmail OAuth configuration
 - **DASHBOARD_TROUBLESHOOTING.md** - Troubleshooting guide
+- **ADMIN_APPROVAL_POLICY.md** - Approval policy details
 - **CURSOR_PROMPT.md** - Complete project generation prompt
 
 ## 🐳 Docker Services
@@ -109,6 +125,7 @@ See the `docs/` folder for comprehensive documentation:
 - ✅ Violation tracking and logging
 - ✅ Multi-database architecture
 - ✅ Docker support
+- ✅ Admin users don't require approval
 
 ## 📝 Requirements
 

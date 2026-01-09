@@ -108,7 +108,8 @@ class DashboardWindow(QDialog):
 # Base list view helper
 def _load_users(list_widget, auth: Authentication):
     try:
-        conn = mysql.connector.connect(**auth.db_config)
+        # Use the _get_conn method which includes allow_public_key_retrieval
+        conn = auth._get_conn()
         cur = conn.cursor()
         cur.execute("SELECT id, username, role, last_login, is_active FROM Users ORDER BY id ASC")
         for id_, username, role, last_login, is_active in cur.fetchall():

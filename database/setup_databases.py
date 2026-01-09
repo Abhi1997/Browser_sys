@@ -45,6 +45,7 @@ def setup_databases():
         "host": db_host,
         "user": os.getenv("DB_USER", "root"),
         "password": os.getenv("DB_PASSWORD", "Innovation"),
+        "allow_public_key_retrieval": True,  # Required for MySQL 8.0+
     }
     
     print("🔧 Setting up Secure Academic Browser Database...")
