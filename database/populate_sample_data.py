@@ -56,6 +56,7 @@ DB_CONFIG = {
     "host": db_host,
     "user": os.getenv("DB_USER", "root"),
     "password": os.getenv("DB_PASSWORD", "Innovation"),
+    "allow_public_key_retrieval": True,  # Required for MySQL 8.0+
 }
 
 # Add port if specified (for Docker MySQL on different port)
