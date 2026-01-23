@@ -1,0 +1,6 @@
+# Requirements for testing dashboard scripts
+# Install with: pip install -r requirements_test.txt
+
+PyJWT>=2.8.0
+PyQt6>=6.4.0
+PyQt6-WebEngine>=6.4.0
