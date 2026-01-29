@@ -43,12 +43,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         try {
           const response = await verifyToken();
           if (!response.success) {
-            // Log but don't block - continue with token authentication
-            console.warn('Backend verification failed, continuing with token:', response.error);
+            // Log but don't block - continue with token from storage/URL
+            console.warn('Backend verification failed; continuing with token from URL.', response.error ?? '(no message)');
           }
         } catch (err) {
           // Network error - continue with token
-          console.log('Backend not available, continuing with token authentication');
+          console.log('Backend not available; continuing with token from URL.');
         } finally {
           setIsVerifying(false);
         }

@@ -1,79 +1,95 @@
 import React, { useMemo } from 'react';
 import { DashboardLayout } from '@/components/layouts/DashboardLayout';
-import { GlobalStatsCards } from '@/components/super/GlobalStatsCards';
-import { AdminStatsTable } from '@/components/super/AdminStatsTable';
-import { LoginActivityChart } from '@/components/charts/LoginActivityChart';
-import { RoleDistributionChart } from '@/components/charts/RoleDistributionChart';
-import { AdminComparisonChart } from '@/components/charts/AdminComparisonChart';
+import { DashboardStatsCards } from '@/components/shared/DashboardStatsCards';
+import { AdminSwitcher } from '@/components/super/AdminSwitcher';
 import { UserTable } from '@/components/admin/UserTable';
 import { ListTable } from '@/components/admin/ListTable';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
-import { Eye } from 'lucide-react';
-import { useUsers, useStats } from '@/hooks/useDashboardData';
+import { Eye, Building2, Users, GraduationCap } from 'lucide-react';
+import { useAdmins, useUsers, useStudents, useStats } from '@/hooks/useDashboardData';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function SuperAdminDashboard() {
   const { selectedAdminId } = useAuth();
+  const { data: admins, isLoading: adminsLoading } = useAdmins();
   const { data: users } = useUsers();
+  const { data: students } = useStudents();
   const { data: stats } = useStats();
 
   const selectedAdmin = useMemo(() => {
-    if (!selectedAdminId || selectedAdminId === 'system') {
-      return {
-        adminId: 'system',
-        adminName: 'System Overview',
-        totalUsers: stats?.totalUsers || 0,
-        activeUsers: stats?.activeUsers || 0,
-        teachers: stats?.usersByRole?.teacher || 0,
-        students: stats?.usersByRole?.student || 0,
-      };
-    }
-    return null;
-  }, [selectedAdminId, users, stats]);
+    if (!selectedAdminId || selectedAdminId === 'system') return null;
+    return (admins ?? []).find((a: any) => String(a.id) === selectedAdminId);
+  }, [selectedAdminId, admins]);
+
+  const teachers = useMemo(() => {
+    const list = users ?? [];
+    return list.filter((u: any) => u.role === 'teacher');
+  }, [users]);
+
+  const studentCount = useMemo(() => {
+    if (students && Array.isArray(students)) return students.length;
+    return stats?.totalStudents ?? stats?.usersByRole?.student ?? 0;
+  }, [students, stats]);
 
   return (
     <DashboardLayout title="Super Admin Dashboard">
-      {/* Read-only banner */}
-      <div className="mb-6 p-4 rounded-xl bg-accent/10 border border-accent/30 flex items-center gap-3">
-        <Eye className="h-5 w-5 text-accent" />
-        <div className="flex-1">
-          <p className="font-medium text-accent">Read-Only Mode</p>
-          <p className="text-sm text-muted-foreground">
-            You can view all data across institutions but cannot modify any records.
-          </p>
+      <div className="mb-6 p-4 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Eye className="h-5 w-5 text-accent shrink-0" />
+          <div>
+            <p className="font-medium text-accent">Monitor multiple admins</p>
+            <p className="text-sm text-muted-foreground">
+              Each admin has an isolated group (admin → teacher → student). Select an admin to view their group.
+            </p>
+          </div>
         </div>
-        <Badge variant="outline" className="bg-accent/20 text-accent border-accent/30">
+        <Badge variant="outline" className="bg-accent/20 text-accent border-accent/30 shrink-0">
           Super Admin
         </Badge>
       </div>
 
-      {selectedAdmin ? (
-        // Admin-specific view
+      {/* Admin switcher - list of admins from database */}
+      <div className="mb-6">
+        <AdminSwitcher />
+      </div>
+
+      {/* Stats: Total Students, Whitelist, Blacklist */}
+      <div className="mb-8">
+        <DashboardStatsCards />
+      </div>
+
+      {selectedAdminId && selectedAdminId !== 'system' && selectedAdmin ? (
         <>
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-foreground">{selectedAdmin.adminName}</h2>
-            <p className="text-muted-foreground">Viewing institution data (read-only)</p>
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <Building2 className="h-6 w-6 text-primary" />
+              {selectedAdmin.username}
+            </h2>
+            <p className="text-muted-foreground">Admin group (teachers & students). Data from database.</p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="stat-card">
-              <p className="text-sm text-muted-foreground mb-1">Total Users</p>
-              <p className="text-3xl font-bold">{selectedAdmin.totalUsers}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="font-semibold flex items-center gap-2 mb-2">
+                <GraduationCap className="h-4 w-4" />
+                Teachers in this group
+              </h3>
+              <p className="text-2xl font-bold text-primary">{teachers.length}</p>
+              <p className="text-xs text-muted-foreground">
+                (When admin_id is in DB, list will filter by admin)
+              </p>
             </div>
-            <div className="stat-card">
-              <p className="text-sm text-muted-foreground mb-1">Active Users</p>
-              <p className="text-3xl font-bold text-success">{selectedAdmin.activeUsers}</p>
-            </div>
-            <div className="stat-card">
-              <p className="text-sm text-muted-foreground mb-1">Teachers</p>
-              <p className="text-3xl font-bold text-primary">{selectedAdmin.teachers}</p>
-            </div>
-            <div className="stat-card">
-              <p className="text-sm text-muted-foreground mb-1">Students</p>
-              <p className="text-3xl font-bold text-accent">{selectedAdmin.students}</p>
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="font-semibold flex items-center gap-2 mb-2">
+                <Users className="h-4 w-4" />
+                Students in this group
+              </h3>
+              <p className="text-2xl font-bold text-accent">{studentCount}</p>
+              <p className="text-xs text-muted-foreground">
+                (When admin_id is in DB, list will filter by admin)
+              </p>
             </div>
           </div>
-
           <div className="space-y-6">
             <UserTable readOnly />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -83,21 +99,42 @@ export default function SuperAdminDashboard() {
           </div>
         </>
       ) : (
-        // Global overview
         <>
-          <GlobalStatsCards />
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-            <LoginActivityChart />
-            <RoleDistributionChart />
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-foreground">System overview</h2>
+            <p className="text-muted-foreground">All admins and system-wide data. Select an admin above to view their isolated group.</p>
           </div>
-
-          <div className="mt-8">
-            <AdminComparisonChart />
-          </div>
-
-          <div className="mt-8">
-            <AdminStatsTable />
+          {adminsLoading ? (
+            <Skeleton className="h-48 w-full" />
+          ) : (
+            <div className="rounded-lg border bg-card overflow-hidden mb-8">
+              <div className="p-4 border-b bg-muted/30 flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                <h3 className="font-semibold">Admins (from database)</h3>
+              </div>
+              {!admins?.length ? (
+                <div className="p-8 text-center text-muted-foreground text-sm">No admins found</div>
+              ) : (
+                <ul className="divide-y">
+                  {(admins as any[]).map((a: any) => (
+                    <li key={a.id} className="p-4 flex items-center justify-between hover:bg-muted/20">
+                      <div>
+                        <p className="font-medium">{a.username}</p>
+                        <p className="text-xs text-muted-foreground">{a.email ?? a.gmail ?? '—'}</p>
+                      </div>
+                      <Badge variant="outline">{a.isActive ? 'Active' : 'Inactive'}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          <div className="space-y-6">
+            <UserTable readOnly />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ListTable type="whitelist" readOnly />
+              <ListTable type="blacklist" readOnly />
+            </div>
           </div>
         </>
       )}

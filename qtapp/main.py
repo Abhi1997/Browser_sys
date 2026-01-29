@@ -20,6 +20,12 @@ def main():
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
 
     app = QApplication(sys.argv)
+    # Ensure message boxes (errors, info) use black text on light background so text is visible
+    app.setStyleSheet(
+        "QMessageBox { background-color: #ffffff; color: #000000; } "
+        "QMessageBox QLabel { color: #000000; min-width: 280px; } "
+        "QMessageBox QPushButton { color: #000000; background-color: #e5e7eb; border: 1px solid #9ca3af; min-width: 80px; }"
+    )
 
     login_window = GmailLoginWindow()
     login_window.exec()

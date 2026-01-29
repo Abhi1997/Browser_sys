@@ -52,7 +52,7 @@ def create_env_file():
     
     print("\n🌐 Domain Configuration:")
     print("-" * 60)
-    dashboard_url = input("Dashboard URL [https://abhinavpaudel.com]: ").strip() or "https://abhinavpaudel.com"
+    dashboard_url = input("Dashboard URL [https://api.abhinavpaudel.com]: ").strip() or "https://api.abhinavpaudel.com"
     api_url = input("API URL [https://api.abhinavpaudel.com]: ").strip() or "https://api.abhinavpaudel.com"
     
     print("\n🔐 Security Configuration:")
@@ -74,8 +74,9 @@ def create_env_file():
     config = config.replace("DB_USER=root", f"DB_USER={db_user}")
     config = config.replace("DB_PASSWORD=your_database_password", f"DB_PASSWORD={db_password}")
     config = config.replace("DB_NAME=edubrowser", f"DB_NAME={db_name}")
-    config = config.replace("DASHBOARD_URL=https://abhinavpaudel.com", f"DASHBOARD_URL={dashboard_url}")
+    config = config.replace("DASHBOARD_URL=https://api.abhinavpaudel.com", f"DASHBOARD_URL={dashboard_url}")
     config = config.replace("VITE_API_URL=https://api.abhinavpaudel.com", f"VITE_API_URL={api_url}")
+    config = config.replace("API_BASE_URL=https://api.abhinavpaudel.com", f"API_BASE_URL={api_url}")
     config = config.replace("JWT_SECRET=your-super-secret-jwt-key-change-this-in-production", f"JWT_SECRET={jwt_secret}")
     
     # Write .env file
@@ -180,10 +181,10 @@ def main():
     print("✅ Setup Complete!")
     print("=" * 60)
     print("\n📋 Next Steps:")
-    print("   1. Test API server: python api_server.py")
+    print("   1. Use the hosted PHP API at https://api.abhinavpaudel.com (no local API needed)")
     print("   2. Build dashboard: cd react-dashboard && npm run build")
     print("   3. Deploy to your server")
-    print("\n📚 See DEPLOYMENT.md for detailed instructions")
+    print("\n📚 See BROWSER_SETUP.md and docs/PYTHON_APP_SETUP.md for API configuration")
     print("=" * 60)
 
 if __name__ == "__main__":

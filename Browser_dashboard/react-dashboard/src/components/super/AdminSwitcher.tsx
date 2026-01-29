@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Check, ChevronDown, Building2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,41 +11,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUsers } from '@/hooks/useDashboardData';
-import { AdminStats } from '@/lib/types';
+import { useAdmins } from '@/hooks/useDashboardData';
 
 export function AdminSwitcher() {
   const { selectedAdminId, setSelectedAdminId } = useAuth();
-  const { data: users } = useUsers();
+  const { data: admins, isLoading } = useAdmins();
 
-  const adminStats = useMemo((): AdminStats[] => {
-    if (!users) return [];
-
-    // Group by admin (for now, we'll create a single "institution" from all admins)
-    const adminUsers = users.filter((u: any) => u.role === 'admin' || u.role === 'super-admin');
-    
-    if (adminUsers.length === 0) return [];
-
-    // Create a single admin stat entry representing the system
-    const activeUsers = users.filter((u: any) => u.isActive);
-    const teacherUsers = users.filter((u: any) => u.role === 'teacher');
-    const studentUsers = users.filter((u: any) => u.role === 'student');
-
-    return [{
-      id: 'system',
-      adminId: 'system',
-      adminName: 'System Overview',
-      totalUsers: users.length,
-      activeUsers: activeUsers.length,
-      teachers: teacherUsers.length,
-      students: studentUsers.length,
-      activeSessions: 0,
-    }];
-  }, [users]);
-  
-  const selectedAdmin = selectedAdminId 
-    ? adminStats.find(a => a.adminId === selectedAdminId)
-    : null;
+  const adminList = (admins ?? []) as any[];
+  const selectedAdmin = selectedAdminId === 'system' || !selectedAdminId
+    ? { id: 'system', adminName: 'System Overview' }
+    : adminList.find((a: any) => String(a.id) === selectedAdminId);
 
   return (
     <DropdownMenu>
@@ -55,12 +30,14 @@ export function AdminSwitcher() {
             {selectedAdmin ? (
               <>
                 <Building2 className="h-4 w-4 text-primary" />
-                <span className="truncate max-w-[120px]">{selectedAdmin.adminName}</span>
+                <span className="truncate max-w-[120px]">
+                  {selectedAdmin.adminName ?? selectedAdmin.username ?? 'System Overview'}
+                </span>
               </>
             ) : (
               <>
                 <Eye className="h-4 w-4 text-accent" />
-                <span>Global Overview</span>
+                <span>System Overview</span>
               </>
             )}
           </div>
@@ -70,46 +47,48 @@ export function AdminSwitcher() {
       <DropdownMenuContent align="start" className="w-[280px]">
         <DropdownMenuLabel className="flex items-center gap-2">
           <Eye className="h-4 w-4" />
-          View Context
+          Monitor admins
           <Badge variant="outline" className="ml-auto text-[10px] bg-accent/20 text-accent border-accent/30">
             Read Only
           </Badge>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        
-        <DropdownMenuItem 
-          onClick={() => setSelectedAdminId(null)}
+
+        <DropdownMenuItem
+          onClick={() => setSelectedAdminId('system')}
           className="gap-2"
         >
           <Eye className="h-4 w-4 text-accent" />
           <div className="flex-1">
-            <p className="font-medium">Global Overview</p>
-            <p className="text-xs text-muted-foreground">All institutions</p>
+            <p className="font-medium">System Overview</p>
+            <p className="text-xs text-muted-foreground">All admins & data</p>
           </div>
-          {!selectedAdminId && <Check className="h-4 w-4 text-primary" />}
+          {(selectedAdminId === 'system' || !selectedAdminId) && <Check className="h-4 w-4 text-primary" />}
         </DropdownMenuItem>
-        
+
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Institutions
+          Admins (from database)
         </DropdownMenuLabel>
-        
-        {adminStats.map((admin) => (
-          <DropdownMenuItem
-            key={admin.adminId}
-            onClick={() => setSelectedAdminId(admin.adminId)}
-            className="gap-2"
-          >
-            <Building2 className="h-4 w-4 text-primary" />
-            <div className="flex-1">
-              <p className="font-medium">{admin.adminName}</p>
-              <p className="text-xs text-muted-foreground">
-                {admin.totalUsers} users • {admin.activeSessions} active
-              </p>
-            </div>
-            {selectedAdminId === admin.adminId && <Check className="h-4 w-4 text-primary" />}
-          </DropdownMenuItem>
-        ))}
+
+        {isLoading ? (
+          <div className="p-4 text-sm text-muted-foreground">Loading admins…</div>
+        ) : (
+          adminList.map((admin: any) => (
+            <DropdownMenuItem
+              key={admin.id}
+              onClick={() => setSelectedAdminId(String(admin.id))}
+              className="gap-2"
+            >
+              <Building2 className="h-4 w-4 text-primary" />
+              <div className="flex-1">
+                <p className="font-medium">{admin.username}</p>
+                <p className="text-xs text-muted-foreground">{admin.email ?? admin.gmail ?? 'Admin'}</p>
+              </div>
+              {selectedAdminId === String(admin.id) && <Check className="h-4 w-4 text-primary" />}
+            </DropdownMenuItem>
+          ))
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

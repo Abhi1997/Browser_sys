@@ -2,7 +2,9 @@
 
 ## Overview
 
-The dashboard is a web-based interface hosted at `api.abhinavpaudel.com` that requires JWT token authentication. This guide explains how to configure the browser application to connect to and authenticate with the dashboard.
+The dashboard is a web-based interface that talks to the **PHP API** at `https://api.abhinavpaudel.com` (Hostinger). It requires JWT token authentication. This guide explains how to configure the browser application and dashboard to connect to and authenticate with the API.
+
+For browser, CORS, extension, and API URL setup, see **BROWSER_SETUP.md**.
 
 ## Prerequisites
 
@@ -41,8 +43,8 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 ### 1.2: Generate JWT Secret Key
 
 **IMPORTANT**: The `JWT_SECRET` must be the same in both:
-- Browser application (`.env` file)
-- Dashboard backend (server configuration)
+- Browser application (qtapp `.env` file)
+- PHP API backend (Hostinger: `php-api/config.php` or env `JWT_SECRET`)
 
 Generate a secure JWT secret:
 
@@ -63,8 +65,8 @@ Xk9mP2qR7vT4wY8zA1bC3dE5fG6hI9jK0lM
 ```
 
 Copy this value and use it for `JWT_SECRET` in:
-1. Browser `.env` file
-2. Dashboard backend configuration (server-side)
+1. Browser (qtapp) `.env` file
+2. PHP API configuration on Hostinger (`php-api/config.php` or env)
 
 ---
 
@@ -100,13 +102,18 @@ https://api.abhinavpaudel.com/dashboard-teacher?token=...&deviceId=...
 
 ---
 
-## Step 3: Dashboard Backend Configuration
+## Step 3: API Backend Configuration (PHP on Hostinger)
+
+This project uses the **hosted PHP API only** at `https://api.abhinavpaudel.com`; no local Python/Flask API is run.
 
 ### 3.1: JWT Secret Configuration
 
-Ensure your dashboard backend uses the **same** `JWT_SECRET` as the browser application.
+Ensure the **PHP API** at `https://api.abhinavpaudel.com` uses the **same** `JWT_SECRET` as the browser application. Configure it in `php-api/config.php` (or via Hostinger env vars). The React dashboard calls this API using `VITE_API_URL=https://api.abhinavpaudel.com` (set at build time; see BROWSER_SETUP.md).
 
-**For Node.js/Express:**
+**For PHP (Hostinger API):**
+- Set `jwt_secret` in `config.php` or `JWT_SECRET` in the environment so it matches the Qt app `.env`.
+
+**For Node.js/Express (local dev only):**
 ```javascript
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
@@ -282,14 +289,25 @@ print(f"Dashboard URL: {url}")
 2. Close and reopen dashboard to generate new token
 3. Check system clock is correct
 
-### Issue: Dashboard shows "Token verification failed"
+### Issue: "Invalid or expired token" / Backend verification failed / Failed to fetch (students, stats, etc.)
 
-**Cause:** JWT_SECRET mismatch between browser and dashboard
+**Cause:** The PHP API at api.abhinavpaudel.com rejects the token. Almost always **JWT_SECRET mismatch**: the Qt app signs the token with `JWT_SECRET` from its `.env`; the PHP API verifies with `jwt_secret` from its config. They must be **identical**.
 
 **Solution:**
-1. Verify `JWT_SECRET` in browser `.env` matches dashboard backend
-2. Restart both browser app and dashboard server after changing secret
-3. Generate new token (logout and login again)
+1. In qtapp `.env`, set `JWT_SECRET` to the **exact same** value as in the PHP API on Hostinger (`php-api/config.php` or `JWT_SECRET` env).
+2. If you don’t have `JWT_SECRET` in `.env`, the Qt app uses a default and the API will reject the token.
+3. Restart the Qt app after changing `.env`, then log in again and open the dashboard (new token will be generated).
+
+**Step-by-step:** See **docs/JWT_SECRET_MATCH.md** for how to generate one secret and set it in both the Qt app and the PHP API.
+
+### Issue: Dashboard shows "Token verification failed"
+
+**Cause:** JWT_SECRET mismatch between browser app and API backend
+
+**Solution:**
+1. Verify `JWT_SECRET` in qtapp `.env` matches the PHP API (api.abhinavpaudel.com) config exactly
+2. Restart the Qt app after changing the secret
+3. Generate new token (logout and login again, then open dashboard)
 
 ### Issue: Dashboard shows "User: Not loaded, Role: Not set"
 
@@ -349,8 +367,9 @@ print(f"Dashboard URL: {url}")
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DASHBOARD_URL` | Base URL for dashboard | `https://api.abhinavpaudel.com` |
-| `JWT_SECRET` | Secret key for JWT signing | `Xk9mP2qR7vT4wY8zA1bC3dE5fG6hI9jK0lM` |
+| `DASHBOARD_URL` | Base URL where the React dashboard is served (Qt app opens this) | `https://api.abhinavpaudel.com` or `https://www.abhinavpaudel.com` |
+| `VITE_API_URL` | API base URL for React dashboard build (PHP API on Hostinger) | `https://api.abhinavpaudel.com` |
+| `JWT_SECRET` | Secret key for JWT signing (must match Qt app and PHP API) | `Xk9mP2qR7vT4wY8zA1bC3dE5fG6hI9jK0lM` |
 
 ### Optional Variables
 
@@ -363,15 +382,16 @@ print(f"Dashboard URL: {url}")
 
 ## Quick Setup Checklist
 
-- [ ] `.env` file created in project root
-- [ ] `DASHBOARD_URL` set to your dashboard domain
-- [ ] `JWT_SECRET` generated and set (same in browser and dashboard)
-- [ ] Dashboard backend configured to use same `JWT_SECRET`
-- [ ] Dashboard backend validates JWT tokens correctly
+- [ ] `.env` file created in project root (see `env.example`)
+- [ ] `DASHBOARD_URL` set to where the React dashboard is served
+- [ ] `VITE_API_URL=https://api.abhinavpaudel.com` for production dashboard build
+- [ ] `JWT_SECRET` generated and set (same in Qt app and PHP API)
+- [ ] PHP API on Hostinger configured with same `JWT_SECRET`
 - [ ] Tested login as admin/teacher/superadmin
 - [ ] Dashboard opens successfully with authentication
 - [ ] Token and deviceId appear in dashboard URL
 - [ ] Dashboard displays user information correctly
+- [ ] For browser/extension/CORS, see **BROWSER_SETUP.md**
 
 ---
 

@@ -9,11 +9,17 @@ from urllib.parse import urlparse, parse_qs
 from PyQt6.QtCore import QUrl, QObject, pyqtSignal
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QProgressBar, QWidget, 
-    QPushButton, QHBoxLayout, QMessageBox
+    QDialog, QVBoxLayout, QLabel, QProgressBar, QWidget,
+    QPushButton, QHBoxLayout, QMessageBox, QLineEdit, QApplication
 )
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QCursor
 from authentication import Authentication
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 class GmailOAuth(QObject):
     """Gmail OAuth handler using PyQt6 WebEngine"""
@@ -415,7 +421,24 @@ class GmailLoginWindow(QDialog):
         """)
         self.login_button.clicked.connect(self.handle_password_login)
         layout.addWidget(self.login_button)
-        
+
+        # Forgot password link
+        self.forgot_btn = QPushButton("Forgot password?")
+        self.forgot_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.forgot_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #3b82f6;
+                border: none;
+                font-size: 12px;
+                text-decoration: underline;
+            }
+            QPushButton:hover { color: #2563eb; }
+        """)
+        self.forgot_btn.setFlat(True)
+        self.forgot_btn.clicked.connect(self.show_forgot_password_dialog)
+        layout.addWidget(self.forgot_btn)
+
         # Gmail login button (moved below Login button)
         self.gmail_button = QPushButton("Login with Gmail")
         self.gmail_button.setMinimumHeight(40)
@@ -541,11 +564,113 @@ class GmailLoginWindow(QDialog):
     def on_oauth_failed(self, error):
         """Handle OAuth failure"""
         QMessageBox.warning(
-            self, 
-            "Authentication Failed", 
+            self,
+            "Authentication Failed",
             error
         )
-    
+
+    def show_forgot_password_dialog(self):
+        """Open dialog to request password reset email."""
+        if requests is None:
+            QMessageBox.warning(
+                self,
+                "Forgot password",
+                "The requests library is required. Install it with: pip install requests"
+            )
+            return
+
+        # Ensure .env is loaded (in case cwd differs)
+        try:
+            from pathlib import Path
+            from dotenv import load_dotenv
+            root = Path(__file__).resolve().parent
+            load_dotenv(root / ".env")
+        except Exception:
+            pass
+        # Must use the API host (api.abhinavpaudel.com), not the dashboard (abhinavpaudel.com)
+        api_base = (os.getenv("API_BASE_URL") or "https://api.abhinavpaudel.com").rstrip("/")
+        forgot_url = f"{api_base}/api/auth/forgot-password"
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Forgot password")
+        dialog.setMinimumWidth(360)
+        # Black text on light background so all text is visible
+        dialog.setStyleSheet("""
+            QDialog { background-color: #ffffff; color: #000000; }
+            QLabel { color: #000000; background: transparent; }
+            QLineEdit { color: #000000; background-color: #ffffff; border: 1px solid #9ca3af; border-radius: 4px; padding: 6px; }
+            QPushButton { color: #000000; background-color: #e5e7eb; border: 1px solid #9ca3af; border-radius: 5px; font-weight: bold; }
+            QPushButton:hover { background-color: #d1d5db; }
+            QPushButton#sendBtn { background-color: #3b82f6; color: #ffffff; border-color: #2563eb; }
+            QPushButton#sendBtn:hover { background-color: #2563eb; color: #ffffff; }
+        """)
+        dlayout = QVBoxLayout(dialog)
+        dlayout.setSpacing(12)
+
+        label = QLabel("Enter the email address registered with your account. We'll send you a link to reset your password.")
+        label.setWordWrap(True)
+        dlayout.addWidget(label)
+        email_edit = QLineEdit()
+        email_edit.setPlaceholderText("Registered email address")
+        email_edit.setMinimumHeight(36)
+        dlayout.addWidget(email_edit)
+
+        send_btn = QPushButton("Send reset link")
+        send_btn.setObjectName("sendBtn")
+        send_btn.setMinimumHeight(36)
+
+        def do_send():
+            email = email_edit.text().strip()
+            if not email:
+                QMessageBox.warning(dialog, "Forgot password", "Please enter your email address.")
+                return
+            send_btn.setEnabled(False)
+            send_btn.setText("Sending...")
+            QApplication.processEvents()
+            try:
+                r = requests.post(
+                    forgot_url,
+                    json={"email": email},
+                    headers={"Content-Type": "application/json"},
+                    timeout=15
+                )
+                data = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+                if r.status_code == 200 and data.get("success"):
+                    QMessageBox.information(
+                        dialog,
+                        "Check your email",
+                        "If an account exists with this email, you will receive a password reset link shortly. "
+                        "Check your inbox and spam folder."
+                    )
+                    dialog.accept()
+                else:
+                    err = data.get("error", "Could not send reset link. Try again or contact support.")
+                    if r.status_code == 404:
+                        err = f"{err}\n\nRequested URL: {forgot_url}\n(If this is not api.abhinavpaudel.com, set API_BASE_URL in .env and restart the app.)"
+                    QMessageBox.warning(
+                        dialog,
+                        "Forgot password",
+                        err
+                    )
+            except requests.exceptions.RequestException as e:
+                QMessageBox.warning(
+                    dialog,
+                    "Forgot password",
+                    f"Could not reach the server. Check your connection.\n\n{str(e)}"
+                )
+            finally:
+                send_btn.setEnabled(True)
+                send_btn.setText("Send reset link")
+
+        send_btn.clicked.connect(do_send)
+        dlayout.addWidget(send_btn)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setMinimumHeight(36)
+        cancel_btn.clicked.connect(dialog.reject)
+        dlayout.addWidget(cancel_btn)
+
+        dialog.exec()
+
     def handle_password_login(self):
         """Handle traditional username/password login"""
         from PyQt6.QtWidgets import QMessageBox

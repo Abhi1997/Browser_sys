@@ -27,7 +27,7 @@ except ImportError:
 # Configuration
 DASHBOARD_BASE_URL = "http://localhost:3000"  # Change to https://api.abhinavpaudel.com for production
 # Note: If your dashboard runs on a different port, update this URL
-JWT_SECRET = "your-super-secret-jwt-key-change-this-in-production"  # Must match your backend's JWT_SECRET
+JWT_SECRET = "dFiuubl9qwDYlhBk_XXrEJkLyu5x7acpvhZ5MgvWvwg"  # Must match your backend's JWT_SECRET
 
 # Admin user credentials (for testing)
 ADMIN_USER_ID = 1

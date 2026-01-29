@@ -13,6 +13,30 @@ import urllib.parse
 
 load_dotenv()  # load .env if present
 
+
+def _get_jwt_secret():
+    """
+    Read and normalize JWT_SECRET from environment.
+    Use this everywhere we sign/verify tokens so the value always matches the PHP API.
+    - Strips whitespace.
+    - If the value was accidentally pasted from PHP (e.g. 'jwt_secret' => getenv(...) ?: 'SECRET',),
+      extracts only the actual secret string so token verification still works.
+    """
+    import re
+    raw = os.getenv("JWT_SECRET", "your-secret-key-change-this").strip()
+    # If it looks like PHP/corrupted (contains => or quotes or getenv), extract the secret
+    if not raw or "=>" in raw or "getenv" in raw or ("'" in raw and len(raw) > 60):
+        # Try: last quoted substring (e.g. 'ZnLQFGG8...')
+        quoted = re.findall(r"'([^']{20,})'", raw)
+        if quoted:
+            return quoted[-1].strip()
+        # Try: longest alphanumeric/url-safe segment (typical JWT secret)
+        segments = re.findall(r"[A-Za-z0-9_-]{20,}", raw)
+        if segments:
+            return max(segments, key=len)
+    return raw if raw else "your-secret-key-change-this"
+
+
 class Authentication:
     def __init__(self, host="localhost", user="root", password="", 
                  database="edubrowser"):
@@ -443,7 +467,7 @@ class Authentication:
     
     def generate_token(self, username, role, user_id):
         """Generate JWT token for dashboard authentication"""
-        secret_key = os.getenv("JWT_SECRET", "your-secret-key-change-this")
+        secret_key = _get_jwt_secret()
         # Normalize role format for consistency (superadmin -> super-admin)
         normalized_role = "super-admin" if role == "superadmin" else role
         # Use Unix timestamps (seconds since epoch) as required by dashboard
@@ -466,7 +490,7 @@ class Authentication:
         Returns: dict with user info or None
         """
         try:
-            secret_key = os.getenv("JWT_SECRET", "your-secret-key-change-this")
+            secret_key = _get_jwt_secret()
             payload = jwt.decode(token, secret_key, algorithms=["HS256"])
             
             user_id = payload.get("user_id")

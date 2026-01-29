@@ -294,6 +294,13 @@ def get_stats():
         except:
             blacklist_size = 0
         
+        # Total students (from Students table if exists, else Users with role=student)
+        try:
+            cursor.execute("SELECT COUNT(*) as total FROM Students")
+            total_students = cursor.fetchone()['total']
+        except:
+            total_students = role_distribution.get('student', 0)
+        
         # Recent logins (last 24 hours) - use Users.last_login
         try:
             cursor.execute("""
@@ -311,6 +318,7 @@ def get_stats():
             "success": True,
             "data": {
                 "totalUsers": total_users,
+                "totalStudents": total_students,
                 "activeUsers": active_users,
                 "activeSessions": 0,
                 "roleDistribution": {
@@ -633,10 +641,10 @@ def get_activity():
         params = []
         
         if student_id:
-            query += " WHERE studentId = %s"
+            query += " WHERE student_id = %s"
             params.append(student_id)
         
-        query += " ORDER BY visitStart DESC, createdAt DESC LIMIT %s"
+        query += " ORDER BY visit_start DESC, created_at DESC LIMIT %s"
         params.append(limit)
         
         try:
@@ -685,7 +693,7 @@ def get_violations():
         params = []
         
         if student_id:
-            query += " WHERE studentId = %s"
+            query += " WHERE student_id = %s"
             params.append(student_id)
         
         query += " ORDER BY timestamp DESC, createdAt DESC LIMIT %s"
@@ -1016,6 +1024,59 @@ def remove_from_blacklist(entry_id):
             "success": False,
             "error": str(e)
         }), 500
+
+# ==================== CHANGE LOGS (MODE HISTORY) ====================
+
+@app.route('/api/change-logs', methods=['GET'])
+@require_auth
+def get_change_logs():
+    """Get mode change history (who changed what, when) for admin/super-admin audit"""
+    limit = int(request.args.get('limit', 100))
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute("""
+                SELECT m.id, m.student_id as studentId, m.old_mode as oldMode, m.new_mode as newMode,
+                       m.changed_by as changedBy, m.changed_at as changedAt,
+                       u.username as changedByName
+                FROM ModeHistory m
+                LEFT JOIN Users u ON m.changed_by = u.id
+                ORDER BY m.changed_at DESC
+                LIMIT %s
+            """, (limit,))
+            logs = cursor.fetchall()
+        except Exception:
+            logs = []
+        cursor.close()
+        conn.close()
+        return jsonify({"success": True, "data": logs})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ==================== ADMINS LIST (for super-admin) ====================
+
+@app.route('/api/admins', methods=['GET'])
+@require_auth
+def get_admins():
+    """Get all admin users (for super-admin to monitor multiple admins)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, username, gmail, role, is_active, created_at, last_login
+            FROM Users
+            WHERE role = 'admin'
+            ORDER BY username
+        """)
+        admins = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return jsonify({"success": True, "data": admins})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 # ==================== HEALTH CHECK ====================
 
