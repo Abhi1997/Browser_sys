@@ -3,13 +3,31 @@ Dashboard Window Module
 Opens the web dashboard at api.abhinavpaudel.com with authentication
 """
 
-from PyQt6.QtCore import QUrl
-from PyQt6.QtWidgets import (
-    QDialog, QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QApplication, QStyle, QMessageBox
-)
-from PyQt6.QtWebEngineWidgets import QWebEngineView
+from datetime import datetime
 import urllib.parse
 import os
+
+from PyQt6.QtCore import QUrl
+from PyQt6.QtWidgets import (
+    QDialog, QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QApplication, QStyle, QMessageBox,
+    QPlainTextEdit, QDialogButtonBox,
+)
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEnginePage
+
+
+class _DashboardWebPage(QWebEnginePage):
+    """Custom page that captures JS console messages (log, warn, error) via override."""
+    def __init__(self, profile, on_console_message):
+        super().__init__(profile)
+        self._on_console = on_console_message
+
+    def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
+        if callable(self._on_console):
+            try:
+                self._on_console(level, message, lineNumber, sourceID)
+            except Exception:
+                pass
 
 
 class DashboardWindow(QDialog):
@@ -47,43 +65,73 @@ class DashboardWindow(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # Add Management button at the top (highly visible)
+        # Add Management button at the top only for admin/superadmin (not for teachers)
+        role_lower = (self.user_role or "").lower()
+        show_management = role_lower in ("admin", "superadmin", "super-admin")
         button_container = QWidget()
         button_container.setStyleSheet("background-color: #1f2937; padding: 8px;")
         button_container.setFixedHeight(50)
         button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(10, 5, 10, 5)
         button_layout.setSpacing(10)
-        
-        management_btn = QPushButton("Management Panel")
-        management_btn.setToolTip("Open User & Site Management")
-        management_btn.setFixedHeight(35)
-        management_btn.setMinimumWidth(150)
-        management_btn.setStyleSheet("""
+        if show_management:
+            management_btn = QPushButton("Management Panel")
+            management_btn.setToolTip("Open User & Site Management")
+            management_btn.setFixedHeight(35)
+            management_btn.setMinimumWidth(150)
+            management_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #3b82f6;
+                    color: white;
+                    border: 2px solid #2563eb;
+                    border-radius: 5px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    padding: 5px 15px;
+                }
+                QPushButton:hover {
+                    background-color: #2563eb;
+                    border-color: #1d4ed8;
+                }
+                QPushButton:pressed {
+                    background-color: #1d4ed8;
+                }
+            """)
+            management_btn.clicked.connect(self.open_management)
+            button_layout.addWidget(management_btn)
+        # Debug log button (all roles) - view API/dashboard console messages
+        self._console_log = []
+        self._console_log_max = 300
+        debug_btn = QPushButton("Debug log")
+        debug_btn.setToolTip("View dashboard console messages and API errors")
+        debug_btn.setFixedHeight(35)
+        debug_btn.setMinimumWidth(100)
+        debug_btn.setStyleSheet("""
             QPushButton {
-                background-color: #3b82f6;
+                background-color: #4b5563;
                 color: white;
-                border: 2px solid #2563eb;
+                border: 1px solid #374151;
                 border-radius: 5px;
-                font-size: 14px;
-                font-weight: bold;
-                padding: 5px 15px;
+                font-size: 12px;
+                padding: 5px 10px;
             }
-            QPushButton:hover {
-                background-color: #2563eb;
-                border-color: #1d4ed8;
-            }
-            QPushButton:pressed {
-                background-color: #1d4ed8;
-            }
+            QPushButton:hover { background-color: #374151; }
         """)
-        management_btn.clicked.connect(self.open_management)
-        button_layout.addWidget(management_btn)
+        debug_btn.clicked.connect(self._show_debug_log)
+        button_layout.addWidget(debug_btn)
         button_layout.addStretch()
         layout.addWidget(button_container)
         
-        # Create web view for dashboard
+        # Create web view (use custom page only for console capture; keep reference so page is not GC'd)
         self.view = QWebEngineView(self)
+        try:
+            from PyQt6.QtWebEngineCore import QWebEngineProfile
+            profile = QWebEngineProfile.defaultProfile()
+            self._dashboard_page = _DashboardWebPage(profile, self._on_console_message)
+            self.view.setPage(self._dashboard_page)
+        except Exception as e:
+            print(f"Could not attach console-capture page: {e}")
+            self._dashboard_page = None
         layout.addWidget(self.view)
         
         # Load dashboard URL with authentication
@@ -162,8 +210,8 @@ class DashboardWindow(QDialog):
             
             dashboard_path = role_paths.get(self.user_role.lower(), "dashboard-admin")
             
-            # Base URL - use environment variable or default
-            base_url = os.getenv("DASHBOARD_URL", "https://api.abhinavpaudel.com")
+            # Dashboard at abhinavpaudel.com; API at api.abhinavpaudel.com
+            base_url = os.getenv("DASHBOARD_URL", "https://abhinavpaudel.com")
             
             # Remove trailing slash if present
             base_url = base_url.rstrip('/')
@@ -175,7 +223,41 @@ class DashboardWindow(QDialog):
         except Exception as e:
             print(f"Error building dashboard URL: {e}")
             return None
-    
+
+    def _on_console_message(self, level, message, line_number, source_id):
+        """Capture JS console messages from the dashboard (log, warn, error)."""
+        level_str = {0: "info", 1: "warning", 2: "error"}.get(level, "info")
+        line = f"[{datetime.now().strftime('%H:%M:%S')}] [{level_str}] {message}"
+        if source_id:
+            line += f" ({source_id}:{line_number})"
+        self._console_log.append(line)
+        if len(self._console_log) > self._console_log_max:
+            self._console_log.pop(0)
+
+    def _show_debug_log(self):
+        """Open a dialog showing captured dashboard console messages (API errors, etc.)."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Dashboard debug log")
+        dlg.setMinimumSize(700, 400)
+        dlg.resize(800, 500)
+        layout = QVBoxLayout(dlg)
+        text = QPlainTextEdit(dlg)
+        text.setReadOnly(True)
+        text.setPlaceholderText("Console messages from the dashboard will appear here after you use it.")
+        text.setStyleSheet("font-family: Consolas, monospace; font-size: 12px;")
+        if self._console_log:
+            text.setPlainText("\n".join(self._console_log))
+        else:
+            text.setPlainText("No messages yet. Use the dashboard (e.g. open teacher dashboard); API errors and console output will appear here.")
+        layout.addWidget(text)
+        btn = QPushButton("Copy all")
+        btn.clicked.connect(lambda: QApplication.clipboard().setText(text.toPlainText()))
+        layout.addWidget(btn)
+        close_btn = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        close_btn.rejected.connect(dlg.close)
+        layout.addWidget(close_btn)
+        dlg.exec()
+
     def open_management(self):
         """Open management window and close dashboard"""
         from management_window import ManagementWindow

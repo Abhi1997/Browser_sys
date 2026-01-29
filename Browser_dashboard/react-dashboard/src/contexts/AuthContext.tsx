@@ -12,6 +12,9 @@ import {
 } from '@/lib/auth';
 import { verifyToken } from '@/lib/api';
 
+/** Routes that do not require dashboard auth (anyone can access) */
+const PUBLIC_AUTH_ROUTES = ['/forgot-password', '/reset-password'];
+
 interface AuthContextType {
   user: User | null;
   role: UserRole | null;
@@ -19,6 +22,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   error: string | null;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   selectedAdminId: string | null;
   setSelectedAdminId: (id: string | null) => void;
 }
@@ -84,35 +88,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(verifiedUser);
         } else {
           // Backend verification failed - check if it's a connection error or auth error
-          const isLocalhost = !import.meta.env.VITE_API_URL || 
-                             import.meta.env.VITE_API_URL.includes('localhost') || 
+          const errMsg = response.error ?? '';
+          const isLocalhost = !import.meta.env.VITE_API_URL ||
+                             import.meta.env.VITE_API_URL.includes('localhost') ||
                              import.meta.env.VITE_API_URL.includes('127.0.0.1');
-          
-          if (isLocalhost && (response.error?.includes('Cannot connect') || response.error?.includes('fetch'))) {
-            // Backend not running - use token data (expected in local dev)
-            console.log('Backend not available, using token data for authentication');
-          } else if (response.error?.includes('Signature verification failed') || 
-                     response.error?.includes('Invalid token')) {
+
+          if (isLocalhost && (errMsg.includes('Cannot connect') || errMsg.includes('fetch'))) {
+            // Backend not running - use token from URL (expected in local dev / PyQt)
+            console.log('Backend not available; using token from URL for session.');
+          } else if (errMsg.includes('Signature verification failed') ||
+                     errMsg.includes('Invalid token') ||
+                     errMsg.includes('expired token')) {
             // Backend exists but token is invalid - this is a real error
             setError('Token verification failed. Please check JWT_SECRET matches between browser app and backend.');
             clearAuth();
             setIsLoading(false);
             return;
           } else {
-            // Other backend errors - continue with token data
-            console.warn('Backend verification failed, using token data:', response.error);
+            // Other backend errors (or no error message) - continue with token from URL
+            console.warn('Backend verification failed; using token from URL for session.', errMsg || '(no message)');
           }
         }
       } catch (err) {
-        // Network error - continue with token data (backend not available)
-        const isLocalhost = !import.meta.env.VITE_API_URL || 
-                           import.meta.env.VITE_API_URL.includes('localhost') || 
+        // Network error - continue with token from URL (backend not available)
+        const isLocalhost = !import.meta.env.VITE_API_URL ||
+                           import.meta.env.VITE_API_URL.includes('localhost') ||
                            import.meta.env.VITE_API_URL.includes('127.0.0.1');
-        
+
         if (isLocalhost) {
-          console.log('Backend not available, using token data for authentication');
+          console.log('Backend not available; using token from URL for session.');
         } else {
-          console.warn('Backend verification unavailable, using token data:', err);
+          console.warn('Backend verification unavailable; using token from URL for session.', err);
         }
       }
 
@@ -135,6 +141,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const token = getStoredToken();
+    const deviceId = getDeviceId();
+    if (!token || !deviceId) return;
+    try {
+      const response = await verifyToken();
+      if (response.success && response.data?.user) {
+        setUser(response.data.user);
+      }
+    } catch {
+      // Ignore; keep current user
+    }
+  }, []);
+
+  // Use window.location so we don't need useLocation (AuthProvider is outside Router)
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isPublicAuthRoute = PUBLIC_AUTH_ROUTES.includes(pathname);
+
   const value: AuthContextType = {
     user,
     role: user?.role || null,
@@ -142,9 +166,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     error,
     logout,
+    refreshUser,
     selectedAdminId,
     setSelectedAdminId,
   };
+
+  // Don't block public routes (forgot-password, reset-password) — no login required
+  if (isPublicAuthRoute) {
+    return (
+      <AuthContext.Provider value={value}>
+        {children}
+      </AuthContext.Provider>
+    );
+  }
 
   // Show error in UI if authentication fails (for PyQt6 browsers without console)
   if (error && !isLoading) {
@@ -185,8 +219,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
   
-  // Show debug info if user is not authenticated (even without error)
-  if (!isLoading && !user && !error) {
+  // Show debug info if user is not authenticated (even without error) — skip for public routes
+  if (!isLoading && !user && !error && !isPublicAuthRoute) {
     // Try to get token from URL to debug
     const params = getQueryParams();
     const hasToken = !!params.token;

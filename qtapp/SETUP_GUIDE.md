@@ -281,6 +281,14 @@ python database/create_admin_quick.py
 
 ---
 
+## Related Documentation
+
+- **docs/PYTHON_APP_SETUP.md** – Configure the Python app to use the hosted API (`https://api.abhinavpaudel.com`), auth (POST /auth/login, Bearer token, X-Device-ID), and same JWT/DB as the PHP API; RBAC.
+- **DASHBOARD_SETUP.md** – Configure the Qt app to open the web dashboard and align JWT with the backend.
+- **BROWSER_SETUP.md** – Browser, CORS, extension, and API URL setup for the DCES dashboard and PHP API at `https://api.abhinavpaudel.com`.
+
+---
+
 ## Support & Notes
 
 - **Database**: Hostinger MySQL supports remote access (check your plan)

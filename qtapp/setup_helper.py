@@ -170,7 +170,7 @@ def main():
     
     if env_ok and db_ok and schema_ok:
         print("\n[OK] Setup complete! You can now:")
-        print("   1. Test API: python api_server.py")
+        print("   1. Use the hosted PHP API at https://api.abhinavpaudel.com (no local API)")
         print("   2. Build dashboard: cd react-dashboard && npm run build")
         print("   3. Deploy to your server")
     else:

@@ -49,17 +49,28 @@ export interface BlacklistEntry {
 
 export interface StatsOverview {
   totalUsers: number;
-  activeUsers: number;
-  activeSessions: number;
-  usersByRole: {
+  totalStudents: number;
+  activeUsers?: number;
+  activeSessions?: number;
+  usersByRole?: {
     admin: number;
     teacher: number;
     student: number;
   };
   whitelistSize: number;
   blacklistSize: number;
-  recentLogins: number;
-  recentChanges: number;
+  recentLogins?: number;
+  recentChanges?: number;
+}
+
+export interface ChangeLog {
+  id: string;
+  studentId: string;
+  oldMode: string | null;
+  newMode: string;
+  changedBy: string;
+  changedAt: string;
+  changedByName?: string;
 }
 
 export interface AdminStats {

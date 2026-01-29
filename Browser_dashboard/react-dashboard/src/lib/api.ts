@@ -67,9 +67,12 @@ async function apiRequest<T>(
     }
 
     if (!response.ok) {
+      // Prefer server's message (e.g. PHP exception) for debugging 500s
+      const serverMessage = data.message || data.error;
+      const errorText = serverMessage || `Request failed: ${response.status} ${response.statusText}`;
       return {
         success: false,
-        error: data.error || data.message || `Request failed: ${response.status} ${response.statusText}`,
+        error: errorText,
       };
     }
 
@@ -129,18 +132,54 @@ export async function login(
   });
 }
 
+/** Forgot password: send reset link to registered email. No auth required. */
+export async function forgotPassword(email: string): Promise<ApiResponse<{ message?: string }>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { success: false, error: (data as { error?: string }).error || 'Request failed' };
+    }
+    return { success: true, data: data as { message?: string }, message: (data as { message?: string }).message };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Network error' };
+  }
+}
+
+/** Reset password with token from email link. No auth required. */
+export async function resetPassword(token: string, newPassword: string): Promise<ApiResponse<{ message?: string }>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { success: false, error: (data as { error?: string }).error || 'Request failed' };
+    }
+    return { success: true, data: data as { message?: string }, message: (data as { message?: string }).message };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Network error' };
+  }
+}
+
 // Stats endpoints
 export async function getStatsOverview(): Promise<ApiResponse<StatsOverview>> {
   const response = await apiRequest('/api/stats');
   if (response.success && response.data) {
-    // Transform API response to match StatsOverview interface
     const data = response.data as any;
     return {
       success: true,
       data: {
         totalUsers: data.totalUsers || 0,
-        activeUsers: data.activeUsers || 0,
-        activeSessions: 0, // Not tracked yet
+        totalStudents: data.totalStudents ?? data.roleDistribution?.student ?? 0,
+        activeUsers: data.activeUsers ?? 0,
+        activeSessions: data.activeSessions ?? 0,
         usersByRole: {
           admin: data.roleDistribution?.admin || 0,
           teacher: data.roleDistribution?.teacher || 0,
@@ -148,12 +187,33 @@ export async function getStatsOverview(): Promise<ApiResponse<StatsOverview>> {
         },
         whitelistSize: data.whitelistSize || 0,
         blacklistSize: data.blacklistSize || 0,
-        recentLogins: data.recentLogins || 0,
-        recentChanges: 0, // Not tracked yet
+        recentLogins: data.recentLogins ?? 0,
+        recentChanges: data.recentChanges ?? 0,
       },
     };
   }
   return response as ApiResponse<StatsOverview>;
+}
+
+export async function getChangeLogs(limit: number = 100): Promise<ApiResponse<import('./types').ChangeLog[]>> {
+  return apiRequest(`/api/change-logs?limit=${limit}`);
+}
+
+export async function getAdmins(): Promise<ApiResponse<User[]>> {
+  const response = await apiRequest('/api/admins');
+  if (response.success && response.data) {
+    const users = (response.data as any[]).map((u: any) => ({
+      id: String(u.id),
+      username: u.username,
+      email: u.gmail || u.email || '',
+      role: u.role === 'superadmin' ? 'super-admin' : u.role,
+      isActive: u.isActive ?? u.is_active,
+      createdAt: u.createdAt || u.created_at,
+      lastLogin: u.lastLogin || u.last_login,
+    }));
+    return { success: true, data: users };
+  }
+  return response as ApiResponse<User[]>;
 }
 
 export async function getAdminStats(adminId: string): Promise<ApiResponse<AdminStats>> {

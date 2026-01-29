@@ -1,0 +1,448 @@
+{
+  "info": {
+    "name": "DCES Dashboard API",
+    "description": "Postman collection for testing the DCES Dashboard PHP API (api.abhinavpaudel.com).\n\n**Setup:**\n1. Set `base_url` to your API (e.g. https://api.abhinavpaudel.com or http://localhost for local PHP).\n2. Run **Auth → Login** with valid credentials.\n3. The token is saved automatically; use it for all other requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://api.abhinavpaudel.com" },
+    { "key": "token", "value": "" },
+    { "key": "device_id", "value": "postman-test-device-001" },
+    { "key": "user_id", "value": "" },
+    { "key": "whitelist_id", "value": "" },
+    { "key": "blacklist_id", "value": "" },
+    { "key": "student_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data && json.data.token) {",
+                  "  pm.collectionVariables.set('token', json.data.token);",
+                  "  pm.test('Token saved', () => pm.expect(pm.collectionVariables.get('token')).to.not.be.empty);",
+                  "}",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has success', () => pm.expect(json).to.have.property('success', true));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"your_password\",\n  \"deviceId\": \"{{device_id}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/login"
+          }
+        },
+        {
+          "name": "Verify Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{token}}\",\n  \"deviceId\": \"{{device_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/verify-token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats",
+      "item": [
+        {
+          "name": "Get Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/stats"
+          }
+        },
+        {
+          "name": "Get Admin Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/stats/admin/1"
+          }
+        },
+        {
+          "name": "Get Login Activity",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/stats/login-activity?days=7"
+          }
+        },
+        {
+          "name": "Get All Admin Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/stats/admins"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/users"
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"newuser\",\n  \"password\": \"temp123\",\n  \"email\": \"newuser@example.com\",\n  \"role\": \"student\",\n  \"isActive\": true\n}"
+            },
+            "url": "{{base_url}}/api/users"
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"updateduser\",\n  \"email\": \"updated@example.com\",\n  \"role\": \"student\",\n  \"isActive\": true\n}"
+            },
+            "url": "{{base_url}}/api/users/{{user_id}}"
+          }
+        },
+        {
+          "name": "Toggle User Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/users/{{user_id}}/toggle-status"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/users/{{user_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Students",
+      "item": [
+        {
+          "name": "Get Students",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/students"
+          }
+        },
+        {
+          "name": "Set Student Mode",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"restricted\",\n  \"changedBy\": 1\n}"
+            },
+            "url": "{{base_url}}/api/students/{{student_id}}/mode"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activity",
+      "item": [
+        {
+          "name": "Get Activity",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/activity?limit=100"
+          }
+        },
+        {
+          "name": "Get Activity (by student)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/activity?studentId={{student_id}}&limit=50"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Violations",
+      "item": [
+        {
+          "name": "Get Violations",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/violations?limit=100"
+          }
+        },
+        {
+          "name": "Get Violations (by student)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/violations?studentId={{student_id}}&limit=50"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Whitelist",
+      "item": [
+        {
+          "name": "Get Whitelist",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/whitelist"
+          }
+        },
+        {
+          "name": "Add to Whitelist",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com\",\n  \"description\": \"Allowed domain\",\n  \"mode\": \"free\"\n}"
+            },
+            "url": "{{base_url}}/api/whitelist"
+          }
+        },
+        {
+          "name": "Update Whitelist Entry",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://updated.example.com\",\n  \"description\": \"Updated\",\n  \"isActive\": true\n}"
+            },
+            "url": "{{base_url}}/api/whitelist/{{whitelist_id}}"
+          }
+        },
+        {
+          "name": "Remove from Whitelist",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/whitelist/{{whitelist_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Blacklist",
+      "item": [
+        {
+          "name": "Get Blacklist",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/blacklist"
+          }
+        },
+        {
+          "name": "Add to Blacklist",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://blocked.com\",\n  \"reason\": \"Blocked domain\",\n  \"mode\": \"free\"\n}"
+            },
+            "url": "{{base_url}}/api/blacklist"
+          }
+        },
+        {
+          "name": "Update Blacklist Entry",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://updated-blocked.com\",\n  \"reason\": \"Updated reason\",\n  \"isActive\": true\n}"
+            },
+            "url": "{{base_url}}/api/blacklist/{{blacklist_id}}"
+          }
+        },
+        {
+          "name": "Remove from Blacklist",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/api/blacklist/{{blacklist_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/notifications"
+          }
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/notifications/1/read"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Export",
+      "item": [
+        {
+          "name": "Export DB",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "X-Device-ID", "value": "{{device_id}}" }
+            ],
+            "url": "{{base_url}}/export/db"
+          }
+        }
+      ]
+    }
+  ]
+}

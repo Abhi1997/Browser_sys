@@ -7,6 +7,8 @@ import {
   getViolations,
   getWhitelist,
   getBlacklist,
+  getChangeLogs,
+  getAdmins,
   setStudentMode,
   toggleUserStatus,
   createUser,
@@ -31,6 +33,7 @@ export function useStats() {
         console.warn('Failed to fetch stats:', response.error);
         return {
           totalUsers: 0,
+          totalStudents: 0,
           activeUsers: 0,
           activeSessions: 0,
           usersByRole: {
@@ -119,6 +122,40 @@ export function useViolations(studentId?: string, limit: number = 100) {
   });
 }
 
+// Change logs query (mode history for admin audit)
+export function useChangeLogs(limit: number = 100) {
+  return useQuery({
+    queryKey: ['changeLogs', limit],
+    queryFn: async () => {
+      const response = await getChangeLogs(limit);
+      if (!response.success) {
+        console.warn('Failed to fetch change logs:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 30000,
+    retry: 2,
+  });
+}
+
+// Admins list query (for super-admin)
+export function useAdmins() {
+  return useQuery({
+    queryKey: ['admins'],
+    queryFn: async () => {
+      const response = await getAdmins();
+      if (!response.success) {
+        console.warn('Failed to fetch admins:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 30000,
+    retry: 2,
+  });
+}
+
 // Mutations
 export function useUpdateStudentMode() {
   const queryClient = useQueryClient();
@@ -134,6 +171,7 @@ export function useUpdateStudentMode() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+      queryClient.invalidateQueries({ queryKey: ['changeLogs'] });
       toast({
         title: 'Mode updated',
         description: 'Student mode has been updated successfully.',
