@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.egg-info/
+.env
+.env.local
+.env.*.local
+.venv/
+venv/
+env/
+dist/
+build/
+.Python
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Node/React
+Browser_dashboard/react-dashboard/node_modules/
+Browser_dashboard/react-dashboard/dist/
+Browser_dashboard/react-dashboard/.vite/
+Browser_dashboard/react-dashboard/.env
+Browser_dashboard/react-dashboard/.env.production
+
+# Qt App
+qtapp/node_modules/
+qtapp/dist/
+qtapp/.vite/
+qtapp/__pycache__/
+qtapp/.venv/
+qtapp/venv/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# Qodo
+.qodo/
+
+# Database & Config
+*.sqlite
+*.db
+config.local.php
+.env.example
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Lock files for pip
+pip-freeze.txt
+
+# New folder (temporary)
+New\ folder/
