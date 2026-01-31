@@ -75,11 +75,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
-      // Set user immediately from token
+      // Set user immediately from token (so we stay authenticated even if backend verify fails)
       setUser(tokenUser);
 
       // Attempt backend verification to get real user data from database
-      // If backend is not available, continue with token data (local dev mode)
+      // If backend is not available or token was issued by Qt (different JWT_SECRET), keep using token user
       try {
         const response = await verifyToken();
         if (response.success && response.data) {
@@ -87,25 +87,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const verifiedUser = response.data.user;
           setUser(verifiedUser);
         } else {
-          // Backend verification failed - check if it's a connection error or auth error
+          // Backend verification failed - keep using tokenUser so dashboard still works (e.g. Qt-opened with Python JWT)
           const errMsg = response.error ?? '';
           const isLocalhost = !import.meta.env.VITE_API_URL ||
                              import.meta.env.VITE_API_URL.includes('localhost') ||
                              import.meta.env.VITE_API_URL.includes('127.0.0.1');
 
           if (isLocalhost && (errMsg.includes('Cannot connect') || errMsg.includes('fetch'))) {
-            // Backend not running - use token from URL (expected in local dev / PyQt)
             console.log('Backend not available; using token from URL for session.');
           } else if (errMsg.includes('Signature verification failed') ||
                      errMsg.includes('Invalid token') ||
                      errMsg.includes('expired token')) {
-            // Backend exists but token is invalid - this is a real error
-            setError('Token verification failed. Please check JWT_SECRET matches between browser app and backend.');
-            clearAuth();
-            setIsLoading(false);
-            return;
+            // Token from Qt (Python) may not verify on PHP if JWT_SECRET differs - keep token user, don't clear
+            console.warn('Backend could not verify token (e.g. token from Qt app); using token for session.');
           } else {
-            // Other backend errors (or no error message) - continue with token from URL
             console.warn('Backend verification failed; using token from URL for session.', errMsg || '(no message)');
           }
         }

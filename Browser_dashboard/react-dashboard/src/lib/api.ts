@@ -203,6 +203,11 @@ export async function getDashboardLogs(limit: number = 100): Promise<ApiResponse
   return apiRequest(`/api/dashboard-logs?limit=${limit}`);
 }
 
+/** Log that the user opened the dashboard (who, when). Called once when dashboard layout loads. */
+export async function logDashboardOpen(): Promise<ApiResponse<{ message?: string }>> {
+  return apiRequest('/api/auth/dashboard-log-open', { method: 'POST' });
+}
+
 export async function getHistory(limit: number = 100): Promise<ApiResponse<any[]>> {
   return apiRequest(`/api/history?limit=${limit}`);
 }

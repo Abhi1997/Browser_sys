@@ -13,9 +13,12 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QPushButton, QLineEdit, 
     QTabWidget, QApplication, QToolBar, QStatusBar, QComboBox, 
     QMessageBox, QDialog, QStyle, QHBoxLayout, QLabel, QProgressBar,
-    QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout, QGroupBox
+    QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout, QGroupBox,
+    QMenu, QListWidget, QListWidgetItem, QDialogButtonBox, QCheckBox,
+    QAbstractItemView, QGridLayout,
 )
 from PyQt6.QtGui import QAction, QIcon, QColor, QPalette
+from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import (
     QWebEnginePage, QWebEngineProfile, QWebEngineDownloadRequest,
@@ -24,6 +27,49 @@ from PyQt6.QtWebEngineCore import (
 from authentication import Authentication
 from mode_enforcement import ModeEnforcement
 from gmail_oauth import GmailLoginWindow
+
+try:
+    from bookmarks import load_bookmarks, save_bookmarks, add_bookmark, remove_bookmark
+except ImportError:
+    load_bookmarks = save_bookmarks = add_bookmark = remove_bookmark = None
+try:
+    from profile_extras import load_profile_extras, save_profile_extras
+except ImportError:
+    load_profile_extras = save_profile_extras = None
+
+
+def apply_app_theme(dark: bool):
+    """Apply light or dark theme to the whole application."""
+    app = QApplication.instance()
+    if not app:
+        return
+    if dark:
+        app.setStyleSheet("""
+            QMainWindow, QDialog, QWidget { background-color: #1e1e1e; color: #e0e0e0; }
+            QMenuBar { background-color: #2d2d2d; color: #e0e0e0; }
+            QMenuBar::item:selected { background-color: #404040; }
+            QMenu { background-color: #2d2d2d; color: #e0e0e0; }
+            QMenu::item:selected { background-color: #404040; }
+            QToolBar { background-color: #2d2d2d; color: #e0e0e0; border: none; }
+            QLineEdit, QComboBox { background-color: #3c3c3c; color: #e0e0e0; border: 1px solid #505050; }
+            QPushButton { background-color: #404040; color: #e0e0e0; border: 1px solid #505050; }
+            QPushButton:hover { background-color: #505050; }
+            QTabWidget::pane { background-color: #2d2d2d; border: 1px solid #404040; }
+            QTabBar::tab { background-color: #2d2d2d; color: #e0e0e0; }
+            QTabBar::tab:selected { background-color: #404040; }
+            QStatusBar { background-color: #2d2d2d; color: #a0a0a0; }
+            QListWidget, QTableWidget { background-color: #2d2d2d; color: #e0e0e0; }
+            QHeaderView::section { background-color: #3c3c3c; color: #e0e0e0; }
+            QMessageBox { background-color: #2d2d2d; color: #e0e0e0; }
+            QMessageBox QLabel { color: #e0e0e0; }
+            QMessageBox QPushButton { background-color: #404040; color: #e0e0e0; }
+            QCheckBox { color: #e0e0e0; }
+            QGroupBox { color: #e0e0e0; }
+            QLabel { color: #e0e0e0; }
+        """)
+    else:
+        app.setStyleSheet("")
+    QSettings("EduBrowser", "Settings").setValue("dark_mode", dark)
 
 
 class OfflineOnlyInterceptor(QWebEngineUrlRequestInterceptor):
@@ -127,6 +173,197 @@ LoginWindow = GmailLoginWindow
 # Import dashboard and management windows from separate modules
 from dashboard_window import DashboardWindow
 from management_window import ManagementWindow
+
+
+class HistoryDialog(QDialog):
+    """Shows the current user's personal browsing history (from API)."""
+    def __init__(self, parent=None, auth=None, user_id=None, username=None, user_role=None):
+        super().__init__(parent)
+        self.setWindowTitle("Browsing History")
+        self.resize(700, 450)
+        self.auth = auth
+        self.user_id = user_id
+        self.username = username
+        self.user_role = user_role
+        self.main_window = parent
+        layout = QVBoxLayout(self)
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Title", "URL", "Visited"])
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.doubleClicked.connect(self._open_selected)
+        layout.addWidget(self.table)
+        btn_layout = QHBoxLayout()
+        open_btn = QPushButton("Open in current tab")
+        open_btn.clicked.connect(self._open_selected)
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self._load_history)
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(open_btn)
+        btn_layout.addWidget(refresh_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
+        self._load_history()
+
+    def _load_history(self):
+        self.table.setRowCount(0)
+        if not self.auth or not self.user_id:
+            return
+        rows = self.auth.get_browsing_history(
+            self.user_id, self.username, self.user_role, limit=300
+        )
+        for r in rows:
+            title = (r.get("pageTitle") or r.get("page_title") or "").strip() or "(No title)"
+            url = (r.get("url") or "").strip()
+            visited = (r.get("visitedAt") or r.get("visited_at") or "").strip()
+            if not url:
+                continue
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(title[:80]))
+            self.table.setItem(row, 1, QTableWidgetItem(url))
+            self.table.setItem(row, 2, QTableWidgetItem(visited[:19] if len(visited) > 19 else visited))
+
+    def _open_selected(self):
+        row = self.table.currentRow()
+        if row < 0:
+            return
+        url_item = self.table.item(row, 1)
+        if url_item and self.main_window and self.main_window.current_view():
+            self.main_window.current_view().setUrl(QUrl(url_item.text()))
+            self.accept()
+
+
+class BookmarksDialog(QDialog):
+    """Shows and manages the current user's personal bookmarks (local storage)."""
+    def __init__(self, parent=None, user_id=None):
+        super().__init__(parent)
+        self.setWindowTitle("Bookmarks")
+        self.resize(650, 400)
+        self.user_id = user_id
+        self.main_window = parent
+        layout = QVBoxLayout(self)
+        self.list_widget = QListWidget()
+        self.list_widget.doubleClicked.connect(self._open_selected)
+        layout.addWidget(self.list_widget)
+        btn_layout = QHBoxLayout()
+        open_btn = QPushButton("Open in current tab")
+        open_btn.clicked.connect(self._open_selected)
+        remove_btn = QPushButton("Remove")
+        remove_btn.clicked.connect(self._remove_selected)
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self._load_bookmarks)
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(open_btn)
+        btn_layout.addWidget(remove_btn)
+        btn_layout.addWidget(refresh_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
+        self._load_bookmarks()
+
+    def _load_bookmarks(self):
+        self.list_widget.clear()
+        if not self.user_id or load_bookmarks is None:
+            return
+        for b in load_bookmarks(self.user_id):
+            title = (b.get("title") or b.get("url") or "").strip() or "(No title)"
+            url = (b.get("url") or "").strip()
+            self.list_widget.addItem(f"{title}  —  {url}")
+            self.list_widget.item(self.list_widget.count() - 1).setData(Qt.ItemDataRole.UserRole, url)
+
+    def _open_selected(self):
+        item = self.list_widget.currentItem()
+        if not item:
+            return
+        url = item.data(Qt.ItemDataRole.UserRole)
+        if url and self.main_window and self.main_window.current_view():
+            self.main_window.current_view().setUrl(QUrl(url))
+            self.accept()
+
+    def _remove_selected(self):
+        item = self.list_widget.currentItem()
+        if not item or not self.user_id or remove_bookmark is None:
+            return
+        url = item.data(Qt.ItemDataRole.UserRole)
+        if url and remove_bookmark(self.user_id, url):
+            self._load_bookmarks()
+
+
+class ProfileDialog(QDialog):
+    """Simple editable profile (name, email, number). Password changes use Forgot password."""
+    def __init__(self, parent=None, auth=None, user_id=None):
+        super().__init__(parent)
+        self.setWindowTitle("My Profile")
+        self.resize(420, 320)
+        self.auth = auth
+        self.user_id = user_id
+        self.main_window = parent
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        self.username_edit = QLineEdit()
+        self.username_edit.setPlaceholderText("Your name / username")
+        self.username_edit.setMaxLength(100)
+        form.addRow("Name (username):", self.username_edit)
+        self.gmail_edit = QLineEdit()
+        self.gmail_edit.setPlaceholderText("your@email.com")
+        self.gmail_edit.setMaxLength(255)
+        form.addRow("Email:", self.gmail_edit)
+        self.phone_edit = QLineEdit()
+        self.phone_edit.setPlaceholderText("Optional phone number")
+        self.phone_edit.setMaxLength(50)
+        form.addRow("Phone:", self.phone_edit)
+        layout.addLayout(form)
+        hint = QLabel("To change your password, use Forgot password from the login screen.")
+        hint.setStyleSheet("color: #6b7280; font-size: 11px;")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        btn_layout = QHBoxLayout()
+        save_btn = QPushButton("Save")
+        save_btn.clicked.connect(self._save)
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(save_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+        self._load()
+
+    def _load(self):
+        if not self.auth or not self.user_id:
+            return
+        profile = self.auth.get_user_profile(self.user_id)
+        self.username_edit.setText((profile.get("username") or "").strip())
+        self.gmail_edit.setText((profile.get("gmail") or "").strip())
+        if load_profile_extras:
+            extras = load_profile_extras(self.user_id)
+            self.phone_edit.setText((extras.get("phone") or "").strip())
+
+    def _save(self):
+        if not self.auth or not self.user_id:
+            return
+        username = self.username_edit.text().strip()
+        if not username:
+            QMessageBox.warning(self, "Profile", "Name (username) is required.")
+            return
+        gmail = self.gmail_edit.text().strip()
+        ok = self.auth.update_user_profile(self.user_id, username=username, gmail=gmail)
+        if not ok:
+            QMessageBox.warning(self, "Profile", "Could not save profile.")
+            return
+        if save_profile_extras:
+            extras = load_profile_extras(self.user_id) or {}
+            extras["phone"] = self.phone_edit.text().strip()[:50]
+            save_profile_extras(self.user_id, extras)
+        if self.main_window:
+            self.main_window.username = username
+            self.main_window._update_window_title()
+        QMessageBox.information(self, "Profile", "Profile saved.")
+        self.accept()
 
 
 class LoadingScreen(QWidget):
@@ -241,6 +478,8 @@ class MainWindow(QMainWindow):
         self.setup_toolbar()
         self.setup_menu()
         self.setup_mode_indicators()
+        # Apply saved dark mode at startup
+        apply_app_theme(self._is_dark_mode())
 
         self.status = QStatusBar()
         self.setStatusBar(self.status)
@@ -377,21 +616,97 @@ class MainWindow(QMainWindow):
 
         # File Menu
         file_menu = menubar.addMenu("&File")
-
         new_tab_act = QAction("New Tab", self)
         new_tab_act.setShortcut("Ctrl+T")
         new_tab_act.triggered.connect(self.add_tab)
         file_menu.addAction(new_tab_act)
-
         close_tab_act = QAction("Close Tab", self)
         close_tab_act.setShortcut("Ctrl+W")
         close_tab_act.triggered.connect(lambda: self.close_tab(self.tabs.currentIndex()))
         file_menu.addAction(close_tab_act)
-
+        file_menu.addSeparator()
         exit_act = QAction("Exit", self)
         exit_act.setShortcut("Ctrl+Q")
         exit_act.triggered.connect(self.close)
         file_menu.addAction(exit_act)
+
+        # Edit Menu
+        edit_menu = menubar.addMenu("&Edit")
+        copy_act = QAction("Copy", self)
+        copy_act.setShortcut("Ctrl+C")
+        copy_act.triggered.connect(lambda: self.current_view() and self.current_view().triggerPageAction(QWebEnginePage.WebAction.Copy))
+        edit_menu.addAction(copy_act)
+        paste_act = QAction("Paste", self)
+        paste_act.setShortcut("Ctrl+V")
+        paste_act.triggered.connect(lambda: self.current_view() and self.current_view().triggerPageAction(QWebEnginePage.WebAction.Paste))
+        edit_menu.addAction(paste_act)
+        select_all_act = QAction("Select All", self)
+        select_all_act.setShortcut("Ctrl+A")
+        select_all_act.triggered.connect(lambda: self.current_view() and self.current_view().triggerPageAction(QWebEnginePage.WebAction.SelectAll))
+        edit_menu.addAction(select_all_act)
+
+        # View Menu
+        view_menu = menubar.addMenu("&View")
+        zoom_in_act = QAction("Zoom In", self)
+        zoom_in_act.setShortcut("Ctrl++")
+        zoom_in_act.triggered.connect(self._zoom_in)
+        view_menu.addAction(zoom_in_act)
+        zoom_out_act = QAction("Zoom Out", self)
+        zoom_out_act.setShortcut("Ctrl+-")
+        zoom_out_act.triggered.connect(self._zoom_out)
+        view_menu.addAction(zoom_out_act)
+        zoom_reset_act = QAction("Reset Zoom", self)
+        zoom_reset_act.setShortcut("Ctrl+0")
+        zoom_reset_act.triggered.connect(self._zoom_reset)
+        view_menu.addAction(zoom_reset_act)
+        view_menu.addSeparator()
+        fullscreen_act = QAction("Full Screen", self)
+        fullscreen_act.setShortcut("F11")
+        fullscreen_act.triggered.connect(self._toggle_fullscreen)
+        view_menu.addAction(fullscreen_act)
+
+        # Window Menu
+        window_menu = menubar.addMenu("&Window")
+        next_tab_act = QAction("Next Tab", self)
+        next_tab_act.setShortcut("Ctrl+Tab")
+        next_tab_act.triggered.connect(self._next_tab)
+        window_menu.addAction(next_tab_act)
+        prev_tab_act = QAction("Previous Tab", self)
+        prev_tab_act.setShortcut("Ctrl+Shift+Tab")
+        prev_tab_act.triggered.connect(self._prev_tab)
+        window_menu.addAction(prev_tab_act)
+
+        # History Menu (personal browsing history)
+        history_menu = menubar.addMenu("&History")
+        show_history_act = QAction("Show History", self)
+        show_history_act.setShortcut("Ctrl+H")
+        show_history_act.triggered.connect(self.show_history_dialog)
+        history_menu.addAction(show_history_act)
+
+        # Bookmarks Menu
+        bookmarks_menu = menubar.addMenu("&Bookmarks")
+        show_bookmarks_act = QAction("Show Bookmarks", self)
+        show_bookmarks_act.setShortcut("Ctrl+Shift+B")
+        show_bookmarks_act.triggered.connect(self.show_bookmarks_dialog)
+        bookmarks_menu.addAction(show_bookmarks_act)
+        add_bookmark_act = QAction("Add Bookmark", self)
+        add_bookmark_act.setShortcut("Ctrl+D")
+        add_bookmark_act.triggered.connect(self.add_current_bookmark)
+        bookmarks_menu.addAction(add_bookmark_act)
+
+        # Profile Menu (simple in-app profile, not dashboard)
+        profile_menu = menubar.addMenu("&Profile")
+        edit_profile_act = QAction("Edit Profile", self)
+        edit_profile_act.triggered.connect(self.show_profile_dialog)
+        profile_menu.addAction(edit_profile_act)
+
+        # Settings Menu
+        settings_menu = menubar.addMenu("&Settings")
+        self.dark_mode_act = QAction("Dark mode", self)
+        self.dark_mode_act.setCheckable(True)
+        self.dark_mode_act.setChecked(self._is_dark_mode())
+        self.dark_mode_act.triggered.connect(self._toggle_dark_mode)
+        settings_menu.addAction(self.dark_mode_act)
 
     def current_tab(self) -> BrowserTab:
         return self.tabs.currentWidget()
@@ -417,6 +732,83 @@ class MainWindow(QMainWindow):
             self.tabs.removeTab(index)
         else:
             self.close()  # Close window if last tab is closed
+
+    def _zoom_in(self):
+        if self.current_view():
+            f = self.current_view().zoomFactor()
+            self.current_view().setZoomFactor(min(3.0, f + 0.25))
+            self._update_zoom_combo()
+
+    def _zoom_out(self):
+        if self.current_view():
+            f = self.current_view().zoomFactor()
+            self.current_view().setZoomFactor(max(0.25, f - 0.25))
+            self._update_zoom_combo()
+
+    def _zoom_reset(self):
+        if self.current_view():
+            self.current_view().setZoomFactor(1.0)
+            self.zoom_combo.setCurrentText("100%")
+
+    def _update_zoom_combo(self):
+        if self.current_view():
+            f = self.current_view().zoomFactor()
+            pct = int(round(f * 100))
+            self.zoom_combo.setCurrentText(f"{pct}%")
+
+    def _toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+
+    def _next_tab(self):
+        idx = (self.tabs.currentIndex() + 1) % self.tabs.count()
+        self.tabs.setCurrentIndex(idx)
+
+    def _prev_tab(self):
+        idx = (self.tabs.currentIndex() - 1 + self.tabs.count()) % self.tabs.count()
+        self.tabs.setCurrentIndex(idx)
+
+    def show_history_dialog(self):
+        """Open dialog with current user's personal browsing history."""
+        dlg = HistoryDialog(
+            self, auth=self.auth, user_id=self.user_id,
+            username=self.username, user_role=self.user_role
+        )
+        dlg.exec()
+
+    def show_bookmarks_dialog(self):
+        """Open dialog with current user's personal bookmarks."""
+        dlg = BookmarksDialog(self, user_id=self.user_id)
+        dlg.exec()
+
+    def add_current_bookmark(self):
+        """Add current page to bookmarks (personal)."""
+        if not self.current_view() or not self.user_id or add_bookmark is None:
+            return
+        url = self.current_view().url().toString()
+        if not url or url.startswith("about:"):
+            QMessageBox.information(self, "Bookmarks", "No page to bookmark.")
+            return
+        title = self.current_view().title() or url
+        if add_bookmark(self.user_id, url, title):
+            QMessageBox.information(self, "Bookmarks", f"Bookmarked: {title[:50]}...")
+        else:
+            QMessageBox.warning(self, "Bookmarks", "Could not save bookmark.")
+
+    def _is_dark_mode(self):
+        return QSettings("EduBrowser", "Settings").value("dark_mode", False, type=bool)
+
+    def _toggle_dark_mode(self):
+        dark = self._is_dark_mode()
+        apply_app_theme(not dark)
+        self.dark_mode_act.setChecked(not dark)
+
+    def show_profile_dialog(self):
+        """Open simple editable profile (name, email, phone). Password via Forgot password."""
+        dlg = ProfileDialog(self, auth=self.auth, user_id=self.user_id)
+        dlg.exec()
 
     def tab_changed(self, index):
         if self.current_view():
@@ -654,8 +1046,8 @@ class MainWindow(QMainWindow):
             )
             return
         
-        if self.user_role in ("admin", "superadmin", "teacher"):
+        if self.user_role in ("admin", "superadmin", "teacher", "superuser"):
             dashboard_window = DashboardWindow(self)
             dashboard_window.show()
         else:
-            QMessageBox.information(self, "Access Denied", "Dashboard is only available for administrators and teachers.")
+            QMessageBox.information(self, "Access Denied", "Dashboard is only available for superusers, administrators, and teachers.")

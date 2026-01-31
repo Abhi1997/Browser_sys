@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatRole, getRoleBadgeClass } from '@/lib/auth';
+import { logDashboardOpen } from '@/lib/api';
 import { Bell, LogOut, User, Shield, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AdminSwitcher } from '@/components/super/AdminSwitcher';
+import { DashboardSwitcher } from '@/components/super/DashboardSwitcher';
 import { NotificationsPanel } from '@/components/shared/NotificationsPanel';
 
 interface DashboardLayoutProps {
@@ -23,6 +25,14 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children, title }: DashboardLayoutProps) {
   const { user, role, logout } = useAuth();
   const [showNotifications, setShowNotifications] = React.useState(false);
+  const hasLoggedOpen = useRef(false);
+
+  // Log dashboard open (who, when) to DB for dashboard logs tab
+  useEffect(() => {
+    if (!user?.id || hasLoggedOpen.current) return;
+    hasLoggedOpen.current = true;
+    logDashboardOpen().catch(() => {});
+  }, [user?.id]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -40,9 +50,12 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
               </div>
             </div>
             
-            {role === 'super-admin' && (
-              <div className="ml-8">
+            {(role === 'super-admin' || role === 'superuser') && (
+              <div className="ml-8 flex items-center gap-4">
                 <AdminSwitcher />
+                {role === 'superuser' && (
+                  <DashboardSwitcher />
+                )}
               </div>
             )}
           </div>

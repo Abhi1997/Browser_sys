@@ -65,9 +65,9 @@ class DashboardWindow(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # Add Management button at the top only for admin/superadmin (not for teachers)
+        # Add Management button at the top for admin/superadmin/superuser (not for teachers)
         role_lower = (self.user_role or "").lower()
-        show_management = role_lower in ("admin", "superadmin", "super-admin")
+        show_management = role_lower in ("admin", "superadmin", "super-admin", "superuser")
         button_container = QWidget()
         button_container.setStyleSheet("background-color: #1f2937; padding: 8px;")
         button_container.setFixedHeight(50)
@@ -210,8 +210,9 @@ class DashboardWindow(QDialog):
             # Get device ID
             device_id = self._get_device_id()
             
-            # Map role to dashboard path
+            # Map role to dashboard path (superuser has own dashboard + can view others)
             role_paths = {
+                "superuser": "dashboard-superuser",
                 "superadmin": "dashboard-superadmin",
                 "admin": "dashboard-admin",
                 "teacher": "dashboard-teacher"

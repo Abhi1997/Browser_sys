@@ -632,16 +632,27 @@ class Authentication:
             return False
 
     def log_dashboard_open(self, user_id, role, action="dashboard_open"):
-        """Log dashboard open event by user (for admin dashboard logs)."""
+        """Log dashboard open event by user (who opened dashboard, when). DB: DashboardLogs."""
         try:
             device_info = self.get_device_info()
             conn = self._get_conn()
             cursor = conn.cursor()
-            role_enum = "teacher" if role and role.lower() == "teacher" else ("admin" if role and role.lower() in ("admin", "superadmin", "super-admin") else "teacher")
+            r = (role or "").lower()
+            if r == "superuser":
+                role_enum = "superuser"
+            elif r in ("superadmin", "super-admin"):
+                role_enum = "superadmin"
+            elif r == "admin":
+                role_enum = "admin"
+            elif r == "teacher":
+                role_enum = "teacher"
+            else:
+                role_enum = "teacher"
+            # Use NOW() in DB so date/time is in server timezone; still pass for compatibility
             cursor.execute("""
                 INSERT INTO DashboardLogs (user_id, role, action, endpoint, ip_address, device_id, created_at)
-                VALUES (%s, %s, %s, NULL, %s, %s, %s)
-            """, (user_id, role_enum, action, device_info.get("ip_address"), device_info.get("device_id"), datetime.now()))
+                VALUES (%s, %s, %s, NULL, %s, %s, NOW())
+            """, (user_id, role_enum, action, device_info.get("ip_address"), device_info.get("device_id")))
             conn.commit()
             cursor.close()
             conn.close()
@@ -801,6 +812,88 @@ class Authentication:
         except Exception as e:
             # Table might not exist yet
             print(f"Error adding browsing history: {e}")
+
+    def get_browsing_history(self, user_id, username=None, role=None, limit=200):
+        """Fetch current user's browsing history from API (personal only). Returns list of {url, pageTitle, visitedAt}."""
+        try:
+            import os
+            if not username or not role:
+                try:
+                    conn = self._get_conn()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT username, role FROM Users WHERE id = %s", (user_id,))
+                    row = cursor.fetchone()
+                    cursor.close()
+                    conn.close()
+                    if row:
+                        username = username or row[0]
+                        role = role or row[1]
+                except Exception:
+                    pass
+            base_url = (os.getenv("API_BASE_URL") or "").rstrip("/")
+            if not base_url:
+                return []
+            token = self.generate_token(username or "", role or "student", user_id)
+            if isinstance(token, bytes):
+                token = token.decode("utf-8")
+            import urllib.request
+            req = urllib.request.Request(
+                f"{base_url}/api/history?limit={min(max(limit, 1), 500)}",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                import json
+                data = json.loads(resp.read().decode())
+            if isinstance(data, dict) and data.get("success") and isinstance(data.get("data"), list):
+                return data["data"]
+            return []
+        except Exception as e:
+            print(f"Error fetching browsing history: {e}")
+            return []
+
+    def get_user_profile(self, user_id):
+        """Get current user's profile (username, gmail) from DB. For in-app profile edit only."""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("SELECT username, gmail FROM Users WHERE id = %s", (user_id,))
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            if row:
+                return {"username": row[0] or "", "gmail": row[1] or ""}
+            return {"username": "", "gmail": ""}
+        except Exception as e:
+            print(f"Error getting user profile: {e}")
+            return {"username": "", "gmail": ""}
+
+    def update_user_profile(self, user_id, username=None, gmail=None):
+        """Update current user's profile (username, gmail). Returns True on success."""
+        if not user_id:
+            return False
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            if username is not None and gmail is not None:
+                cursor.execute(
+                    "UPDATE Users SET username = %s, gmail = %s WHERE id = %s",
+                    (str(username).strip()[:100], (gmail or "").strip()[:255], user_id),
+                )
+            elif username is not None:
+                cursor.execute("UPDATE Users SET username = %s WHERE id = %s", (str(username).strip()[:100], user_id))
+            elif gmail is not None:
+                cursor.execute("UPDATE Users SET gmail = %s WHERE id = %s", (str(gmail or "").strip()[:255], user_id))
+            else:
+                cursor.close()
+                conn.close()
+                return True
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error updating user profile: {e}")
+            return False
     
     @property
     def db_config(self):

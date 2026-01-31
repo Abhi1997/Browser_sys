@@ -182,10 +182,50 @@ function sessions_list() {
     jsonResp(['success' => true, 'data' => $rows]);
 }
 
+/**
+ * Log dashboard open (who opened dashboard, when). Call from web dashboard on load.
+ * Qt app logs via Python auth.log_dashboard_open(); web logs via this endpoint.
+ */
+function log_dashboard_open() {
+    $user = requireAuth();
+    $userId = $user['userId'] ?? $user['user_id'] ?? null;
+    if (!$userId) {
+        jsonResp(['success' => false, 'error' => 'Invalid user'], 401);
+    }
+    $role = strtolower($user['role'] ?? '');
+    // Normalize to DB ENUM: teacher, admin, superadmin, superuser
+    $roleEnum = 'teacher';
+    if ($role === 'superuser') {
+        $roleEnum = 'superuser';
+    } elseif (in_array($role, ['superadmin', 'super-admin'], true)) {
+        $roleEnum = 'superadmin';
+    } elseif ($role === 'admin') {
+        $roleEnum = 'admin';
+    } elseif ($role === 'teacher') {
+        $roleEnum = 'teacher';
+    }
+    $ip = $_SERVER['REMOTE_ADDR'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? null;
+    if (is_string($ip) && strpos($ip, ',') !== false) {
+        $ip = trim(explode(',', $ip)[0]);
+    }
+    $deviceId = $_SERVER['HTTP_X_DEVICE_ID'] ?? null;
+    $pdo = db();
+    try {
+        $st = $pdo->prepare("
+            INSERT INTO DashboardLogs (user_id, role, action, endpoint, ip_address, device_id, created_at)
+            VALUES (?, ?, 'dashboard_open', ?, ?, ?, NOW())
+        ");
+        $st->execute([$userId, $roleEnum, null, $ip, $deviceId]);
+    } catch (Throwable $e) {
+        jsonResp(['success' => false, 'error' => 'Failed to log dashboard open'], 500);
+    }
+    jsonResp(['success' => true, 'message' => 'Logged']);
+}
+
 function dashboard_logs() {
     $user = requireAuth();
-    $role = $user['role'] ?? '';
-    if (!in_array(strtolower($role), ['admin', 'super-admin', 'superuser'], true)) {
+    $role = strtolower($user['role'] ?? '');
+    if (!in_array($role, ['admin', 'super-admin', 'superadmin', 'superuser'], true)) {
         jsonResp(['success' => false, 'error' => 'Forbidden'], 403);
     }
     $limit = min(max((int)($_GET['limit'] ?? 100), 1), 500);

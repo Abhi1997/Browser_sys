@@ -30,7 +30,7 @@ function history_list() {
 function history_list_student($studentIdOrUserId) {
     $user = requireAuth();
     $role = $user['role'] ?? '';
-    $teacherOrAdmin = in_array(strtolower($role), ['teacher', 'admin', 'super-admin'], true);
+    $teacherOrAdmin = in_array(strtolower($role), ['teacher', 'admin', 'super-admin', 'superuser'], true);
     if (!$teacherOrAdmin) {
         jsonResp(['success' => false, 'error' => 'Forbidden'], 403);
     }

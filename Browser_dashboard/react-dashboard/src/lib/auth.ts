@@ -65,11 +65,20 @@ export function extractUserFromToken(token: string): User | null {
     if (role === 'superadmin') {
       role = 'super-admin';
     }
+    // Ensure string for role (API may return number or other)
+    const roleStr = typeof role === 'string' ? role : String(role ?? '');
+    const normalizedRole = roleStr.toLowerCase().trim();
+    
+    // Explicitly allow superuser (ultimate superuser) so it's never rejected
+    if (normalizedRole === 'superuser') {
+      // continue with matchedRole = 'superuser'
+    }
     
     // Ensure role is valid (case-insensitive check)
-    const validRoles: UserRole[] = ['super-admin', 'admin', 'teacher', 'student'];
-    const normalizedRole = role.toLowerCase().trim();
-    const matchedRole = validRoles.find(r => r === normalizedRole);
+    const validRoles: UserRole[] = ['superuser', 'super-admin', 'admin', 'teacher', 'student'];
+    const matchedRole = normalizedRole === 'superuser'
+      ? 'superuser'
+      : validRoles.find(r => r === normalizedRole) ?? null;
     
     if (!matchedRole) {
       // Log to console for debugging (if available)
@@ -116,9 +125,13 @@ export function hasRole(userRole: UserRole, allowedRoles: UserRole[]): boolean {
 }
 
 export function canAccessRoute(userRole: UserRole, route: string): boolean {
+  // Superuser can access all dashboard routes
+  if (userRole === 'superuser') return true;
+  
   const routeRoles: Record<string, UserRole[]> = {
+    '/dashboard-superuser': ['superuser'],
     '/dashboard-superadmin': ['super-admin'],
-    '/dashboard-admin': ['admin'],
+    '/dashboard-admin': ['admin', 'super-admin'],
     '/dashboard-teacher': ['teacher'],
   };
   
@@ -130,6 +143,8 @@ export function canAccessRoute(userRole: UserRole, route: string): boolean {
 
 export function getRoleDashboardPath(role: UserRole): string {
   switch (role) {
+    case 'superuser':
+      return '/dashboard-superuser';
     case 'super-admin':
       return '/dashboard-superadmin';
     case 'admin':
@@ -145,6 +160,8 @@ export function getRoleDashboardPath(role: UserRole): string {
 
 export function getRoleColor(role: UserRole): string {
   switch (role) {
+    case 'superuser':
+      return 'hsl(38, 92%, 50%)';
     case 'super-admin':
       return 'hsl(262, 83%, 58%)';
     case 'admin':
@@ -158,6 +175,8 @@ export function getRoleColor(role: UserRole): string {
 
 export function getRoleBadgeClass(role: UserRole): string {
   switch (role) {
+    case 'superuser':
+      return 'bg-amber-500/20 text-amber-600 border-amber-500/30';
     case 'super-admin':
       return 'bg-accent/20 text-accent border-accent/30';
     case 'admin':

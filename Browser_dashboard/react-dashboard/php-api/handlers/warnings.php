@@ -6,7 +6,7 @@
 function warnings_list() {
     $user = requireAuth();
     $role = strtolower($user['role'] ?? '');
-    if (!in_array($role, ['teacher', 'admin', 'super-admin'], true)) {
+    if (!in_array($role, ['teacher', 'admin', 'super-admin', 'superuser'], true)) {
         jsonResp(['success' => false, 'error' => 'Forbidden'], 403);
     }
     $limit = min(max((int)($_GET['limit'] ?? 100), 1), 500);

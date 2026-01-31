@@ -28,7 +28,7 @@ const colorMap = {
 
 export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps) {
   const { role } = useAuth();
-  const isReadOnly = role === 'super-admin';
+  const isReadOnly = role === 'super-admin'; // superuser can edit
   const { data: violations } = useViolations(undefined, 10);
 
   // Generate notifications from violations and other data
