@@ -58,7 +58,7 @@ qtapp/venv/
 *.sqlite
 *.db
 config.local.php
-.env.example
+# .env.example
 
 # OS
 Thumbs.db
