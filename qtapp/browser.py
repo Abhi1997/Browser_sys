@@ -2,6 +2,10 @@ import sys
 from datetime import datetime
 from PyQt6.QtCore import QUrl, QSize, Qt, QTimer
 import socket
+import os
+os.environ["QTWEBENGINE_DISABLE_GPU"] = "1"
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox --disable-gpu --disable-software-rasterizer"
+
 
 # Try to import requests, fallback to socket-only check if not available
 try:

@@ -1,0 +1,35 @@
+# Python
+qtapp/__pycache__/
+qtapp/*.pyc
+qtapp/*.pyo
+qtapp/*.pyd
+qtapp/.env
+qtapp/.venv/
+qtapp/venv/
+qtapp/dist/
+qtapp/build/
+
+# VS Code
+.vscode/
+
+# Node/React
+node_modules/
+Browser_dashboard/react-dashboard/dist/
+Browser_dashboard/react-dashboard/.vite/
+Browser_dashboard/react-dashboard/.DS_Store
+
+# macOS
+.DS_Store
+
+Browser_dashboard/react-dashboard/node_modules/
+Browser_dashboard/react-dashboard/dist/
+Browser_dashboard/react-dashboard/.vite/
+Browser_dashboard/react-dashboard/.DS_Store
+
+# npm debug logs
+npm-debug.log*
+
+# Environment-specific files
+qtapp/.env.local
+qtapp/.env.production
+qtapp/.env.test
