@@ -256,7 +256,7 @@ class ManagementWindow(QDialog):
                 if 'role' in field:
                     widget.addItems(["student", "teacher", "admin", "superadmin"])
                 else:
-                    widget.addItems(["exam", "study", "restricted", "free"])
+                    widget.addItems(["cached", "study", "restricted", "free"])
             elif field == 'day_of_week':
                 widget = QComboBox()
                 widget.addItems(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "all"])
@@ -399,7 +399,7 @@ class ManagementWindow(QDialog):
                 if 'role' in field:
                     widget.addItems(["student", "teacher", "admin", "superadmin"])
                 else:
-                    widget.addItems(["exam", "study", "restricted", "free"])
+                    widget.addItems(["cached", "study", "restricted", "free"])
                 widget.setCurrentText(current_value)
             elif field == 'day_of_week':
                 widget = QComboBox()

@@ -2,6 +2,8 @@ import React from 'react';
 import { DashboardLayout } from '@/components/layouts/DashboardLayout';
 import { DashboardStatsCards } from '@/components/shared/DashboardStatsCards';
 import { StudentDetailCard } from '@/components/admin/StudentDetailCard';
+import { WarningTriggersTable } from '@/components/admin/WarningTriggersTable';
+import { CachedSitesTable } from '@/components/admin/CachedSitesTable';
 import { Badge } from '@/components/ui/badge';
 import { useStudents } from '@/hooks/useDashboardData';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +22,16 @@ export default function TeacherDashboard() {
       {/* Stats: Total Students, Total Whitelist, Total Blacklist */}
       <div className="mb-8">
         <DashboardStatsCards />
+      </div>
+
+      {/* Violations & warning triggers (recorded with escalation) */}
+      <div className="mb-8">
+        <WarningTriggersTable />
+      </div>
+
+      {/* Cached sites (offline pages for Cached mode) */}
+      <div className="mb-8">
+        <CachedSitesTable />
       </div>
 
       {/* Per-student cards: mode (changeable), violations, history (site access with timestamp) */}

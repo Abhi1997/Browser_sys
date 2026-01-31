@@ -6,10 +6,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
+import SuperuserDashboard from "./pages/SuperuserDashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import Profile from "./pages/Profile";
+import History from "./pages/History";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -57,6 +59,15 @@ const App = () => (
             <Route path="/" element={<Index />} />
             
             <Route
+              path="/dashboard-superuser"
+              element={
+                <ProtectedRoute>
+                  <SuperuserDashboard />
+                </ProtectedRoute>
+              }
+            />
+            
+            <Route
               path="/dashboard-superadmin"
               element={
                 <ProtectedRoute>
@@ -88,6 +99,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <ProtectedRoute>
+                  <History />
                 </ProtectedRoute>
               }
             />

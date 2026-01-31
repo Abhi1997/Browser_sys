@@ -217,7 +217,7 @@ class Authentication:
             permissions: JSON permissions string
             group_code: Group/class code
         """
-        if role not in ("teacher", "admin", "student", "superadmin"):
+        if role not in ("teacher", "admin", "student", "superadmin", "superuser"):
             raise ValueError("Invalid role")
         
         if not password and not gmail:
@@ -595,7 +595,7 @@ class Authentication:
     
     def set_student_mode(self, student_id, new_mode, changed_by):
         """Set student mode (admin/teacher only)"""
-        if new_mode not in ("exam", "study", "restricted", "free"):
+        if new_mode not in ("cached", "study", "restricted", "free"):
             raise ValueError("Invalid mode")
         
         try:
@@ -630,6 +630,177 @@ class Authentication:
         except Exception as e:
             print(f"Error setting student mode: {e}")
             return False
+
+    def log_dashboard_open(self, user_id, role, action="dashboard_open"):
+        """Log dashboard open event by user (for admin dashboard logs)."""
+        try:
+            device_info = self.get_device_info()
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            role_enum = "teacher" if role and role.lower() == "teacher" else ("admin" if role and role.lower() in ("admin", "superadmin", "super-admin") else "teacher")
+            cursor.execute("""
+                INSERT INTO DashboardLogs (user_id, role, action, endpoint, ip_address, device_id, created_at)
+                VALUES (%s, %s, %s, NULL, %s, %s, %s)
+            """, (user_id, role_enum, action, device_info.get("ip_address"), device_info.get("device_id"), datetime.now()))
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Error logging dashboard open: {e}")
+
+    def session_start_or_touch(self, user_id, device_id):
+        """Start a browser session or update last_activity_at (for ML session usage logging)."""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id FROM Sessions WHERE user_id=%s AND device_id=%s AND is_active=1 ORDER BY id DESC LIMIT 1",
+                (user_id, device_id),
+            )
+            row = cursor.fetchone()
+            now = datetime.now()
+            exp = now + timedelta(hours=24)
+            if row:
+                cursor.execute(
+                    "UPDATE Sessions SET last_activity_at=%s, expires_at=%s WHERE id=%s",
+                    (now, exp, row[0]),
+                )
+            else:
+                cursor.execute(
+                    """INSERT INTO Sessions (user_id, device_id, token, created_at, expires_at, last_activity_at, is_active)
+                       VALUES (%s, %s, %s, %s, %s, %s, 1)""",
+                    (user_id, device_id, device_id or str(uuid.uuid4()), now, exp, now),
+                )
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Error session_start_or_touch: {e}")
+
+    def session_touch(self, user_id, device_id):
+        """Update last_activity_at for current session (call periodically or on activity)."""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id FROM Sessions WHERE user_id=%s AND device_id=%s AND is_active=1 ORDER BY id DESC LIMIT 1",
+                (user_id, device_id),
+            )
+            row = cursor.fetchone()
+            if row:
+                cursor.execute(
+                    "UPDATE Sessions SET last_activity_at=%s WHERE id=%s",
+                    (datetime.now(), row[0]),
+                )
+                conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Error session_touch: {e}")
+
+    def session_end(self, user_id, device_id):
+        """Mark current session as ended (on logout/close)."""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE Sessions SET is_active=0 WHERE user_id=%s AND device_id=%s AND is_active=1",
+                (user_id, device_id),
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Error session_end: {e}")
+
+    @staticmethod
+    def get_cache_base_dir():
+        """Base directory for offline cache files (teachers/admins save here)."""
+        import os
+        if os.name == "nt":
+            base = os.environ.get("APPDATA", os.path.expanduser("~"))
+        else:
+            base = os.path.join(os.path.expanduser("~"), ".config")
+        path = os.path.join(base, "EduBrowser", "cache")
+        try:
+            os.makedirs(path, exist_ok=True)
+        except Exception:
+            path = os.path.join(os.path.expanduser("~"), "EduBrowser_cache")
+            os.makedirs(path, exist_ok=True)
+        return path
+
+    def get_cached_site_path(self, url):
+        """Return relative file path for a URL in CachedSites, or None. Used in cached mode."""
+        if not url or not url.strip():
+            return None
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT file_path FROM CachedSites WHERE url=%s AND is_active=1 LIMIT 1",
+                (url.strip()[:2048],),
+            )
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return row[0] if row else None
+        except Exception as e:
+            print(f"Error get_cached_site_path: {e}")
+            return None
+
+    def get_cached_sites_list(self):
+        """Return list of {url, title, file_path} for all active cached sites."""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT url, title, file_path FROM CachedSites WHERE is_active=1 ORDER BY created_at DESC"
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return [{"url": r[0], "title": r[1] or r[0], "file_path": r[2]} for r in rows]
+        except Exception as e:
+            print(f"Error get_cached_sites_list: {e}")
+            return []
+
+    def add_cached_site(self, url, title, file_path, added_by):
+        """Add a cached site (teachers/admins). file_path is relative to cache base dir."""
+        try:
+            if not url or not file_path or not added_by:
+                return False
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO CachedSites (url, title, file_path, added_by, is_active)
+                   VALUES (%s, %s, %s, %s, 1)""",
+                (url[:2048], (title or "")[:512], file_path[:1024], added_by),
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error add_cached_site: {e}")
+            return False
+
+    def add_browsing_history(self, user_id, url, page_title=None, device_id=None):
+        """Append one visit to BrowsingHistory for the user (for own history and teacher view)."""
+        try:
+            if not url or not url.strip():
+                return
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO BrowsingHistory (user_id, url, page_title, visited_at, device_id)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (user_id, url[:2048], (page_title or "")[:512], datetime.now(), device_id))
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            # Table might not exist yet
+            print(f"Error adding browsing history: {e}")
     
     @property
     def db_config(self):

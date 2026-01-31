@@ -6,6 +6,10 @@ import { StudentDetailCard } from '@/components/admin/StudentDetailCard';
 import { ListTable } from '@/components/admin/ListTable';
 import { ExportButton } from '@/components/admin/ExportButton';
 import { ChangeLogsTable } from '@/components/admin/ChangeLogsTable';
+import { DashboardLogsTable } from '@/components/admin/DashboardLogsTable';
+import { WarningTriggersTable } from '@/components/admin/WarningTriggersTable';
+import { SessionUsageTable } from '@/components/admin/SessionUsageTable';
+import { CachedSitesTable } from '@/components/admin/CachedSitesTable';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStudents, useUsers } from '@/hooks/useDashboardData';
@@ -49,8 +53,20 @@ export default function AdminDashboard() {
           <TabsTrigger value="blacklist" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
             Blacklist
           </TabsTrigger>
+          <TabsTrigger value="cached-sites" className="data-[state=active]:bg-violet-600 data-[state=active]:text-white">
+            Cached sites
+          </TabsTrigger>
+          <TabsTrigger value="dashboard-logs" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">
+            Dashboard logs
+          </TabsTrigger>
           <TabsTrigger value="logs" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">
             Change logs
+          </TabsTrigger>
+          <TabsTrigger value="warnings" className="data-[state=active]:bg-warning data-[state=active]:text-warning-foreground">
+            Warning triggers
+          </TabsTrigger>
+          <TabsTrigger value="sessions" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">
+            Session usage
           </TabsTrigger>
         </TabsList>
 
@@ -112,8 +128,21 @@ export default function AdminDashboard() {
           <ListTable type="blacklist" />
         </TabsContent>
 
+        <TabsContent value="cached-sites" className="animate-fade-in">
+          <CachedSitesTable />
+        </TabsContent>
+
+        <TabsContent value="dashboard-logs" className="animate-fade-in">
+          <DashboardLogsTable />
+        </TabsContent>
         <TabsContent value="logs" className="animate-fade-in">
           <ChangeLogsTable />
+        </TabsContent>
+        <TabsContent value="warnings" className="animate-fade-in">
+          <WarningTriggersTable />
+        </TabsContent>
+        <TabsContent value="sessions" className="animate-fade-in">
+          <SessionUsageTable />
         </TabsContent>
       </Tabs>
     </DashboardLayout>

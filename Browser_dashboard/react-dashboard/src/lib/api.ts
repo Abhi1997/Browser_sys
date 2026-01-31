@@ -199,6 +199,27 @@ export async function getChangeLogs(limit: number = 100): Promise<ApiResponse<im
   return apiRequest(`/api/change-logs?limit=${limit}`);
 }
 
+export async function getDashboardLogs(limit: number = 100): Promise<ApiResponse<any[]>> {
+  return apiRequest(`/api/dashboard-logs?limit=${limit}`);
+}
+
+export async function getHistory(limit: number = 100): Promise<ApiResponse<any[]>> {
+  return apiRequest(`/api/history?limit=${limit}`);
+}
+
+export async function getStudentHistory(studentId: string, limit: number = 100): Promise<ApiResponse<any[]>> {
+  return apiRequest(`/api/students/${encodeURIComponent(studentId)}/history?limit=${limit}`);
+}
+
+export async function getWarningTriggers(limit: number = 100, studentId?: string): Promise<ApiResponse<any[]>> {
+  const q = studentId ? `?limit=${limit}&studentId=${encodeURIComponent(studentId)}` : `?limit=${limit}`;
+  return apiRequest(`/api/warning-triggers${q}`);
+}
+
+export async function getSessions(limit: number = 100): Promise<ApiResponse<any[]>> {
+  return apiRequest(`/api/sessions?limit=${limit}`);
+}
+
 export async function getAdmins(): Promise<ApiResponse<User[]>> {
   const response = await apiRequest('/api/admins');
   if (response.success && response.data) {
@@ -399,6 +420,27 @@ export async function setStudentMode(studentId: string, mode: string, changedBy:
   });
 }
 
+// Teachers list (for admin to assign students to teachers)
+export async function getTeachers(): Promise<ApiResponse<any[]>> {
+  return apiRequest('/api/teachers');
+}
+
+// Assign student to teacher (admin only)
+export async function assignStudentToTeacher(studentId: string, teacherId: string | null): Promise<ApiResponse<any>> {
+  return apiRequest(`/api/students/${studentId}/assign-teacher`, {
+    method: 'POST',
+    body: JSON.stringify({ teacherId }),
+  });
+}
+
+// Create admin (superadmin only)
+export async function createAdmin(data: { username: string; password: string; email: string }): Promise<ApiResponse<any>> {
+  return apiRequest('/api/users', {
+    method: 'POST',
+    body: JSON.stringify({ ...data, role: 'admin' }),
+  });
+}
+
 // Activity endpoints
 export async function getActivity(studentId?: string, limit: number = 100): Promise<ApiResponse<any[]>> {
   const query = studentId ? `?studentId=${studentId}&limit=${limit}` : `?limit=${limit}`;
@@ -408,6 +450,15 @@ export async function getActivity(studentId?: string, limit: number = 100): Prom
 export async function getViolations(studentId?: string, limit: number = 100): Promise<ApiResponse<any[]>> {
   const query = studentId ? `?studentId=${studentId}&limit=${limit}` : `?limit=${limit}`;
   return apiRequest(`/api/violations${query}`);
+}
+
+// Cached sites (teachers/admins: list and delete; add is from Qt app "Cache this page")
+export async function getCachedSites(): Promise<ApiResponse<any[]>> {
+  return apiRequest('/api/cached-sites');
+}
+
+export async function deleteCachedSite(id: string): Promise<ApiResponse<void>> {
+  return apiRequest(`/api/cached-sites/${id}`, { method: 'DELETE' });
 }
 
 // Teacher endpoints

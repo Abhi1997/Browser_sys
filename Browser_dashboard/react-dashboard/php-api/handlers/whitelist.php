@@ -1,18 +1,25 @@
 <?php
 /**
- * Whitelist CRUD handlers
+ * Whitelist CRUD handlers - with admin_id data isolation
  */
 
 function whitelist_list() {
-    requireAuth();
+    $user = requireAuth();
     $pdo = db();
+    
+    list($adminClause, $adminParams) = adminIdFilter($user);
+    
     try {
-        $rows = $pdo->query("
-            SELECT id, domain as url, description, added_by as addedBy,
-                   created_at as addedAt, is_active as isActive
+        $sql = "
+            SELECT id, domain as url, description, added_by as addedBy, admin_id,
+                   created_at as addedAt, is_active as isActive, mode
             FROM WhitelistDomains
+            WHERE 1=1 $adminClause
             ORDER BY created_at DESC
-        ")->fetchAll(PDO::FETCH_ASSOC);
+        ";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($adminParams);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
         $rows = [];
     }
@@ -21,8 +28,11 @@ function whitelist_list() {
 
 function whitelist_add() {
     $user = requireAuth();
+    enforceSuperAdminReadOnly($user, 'add to whitelist');
+    
     $data = getJsonBody();
     $userId = $user['userId'] ?? $user['user_id'] ?? null;
+    $adminId = getUserAdminId($user);
     $url = $data['url'] ?? '';
     $domain = preg_replace('#^https?://#', '', $url);
     $domain = explode('/', $domain)[0];
@@ -30,14 +40,15 @@ function whitelist_add() {
 
     $pdo = db();
     $st = $pdo->prepare("
-        INSERT INTO WhitelistDomains (domain, mode, description, added_by, created_at, is_active)
-        VALUES (?, ?, ?, ?, NOW(), 1)
+        INSERT INTO WhitelistDomains (domain, mode, description, added_by, admin_id, created_at, is_active)
+        VALUES (?, ?, ?, ?, ?, NOW(), 1)
     ");
     $st->execute([
         $domain,
         $data['mode'] ?? 'free',
         $data['description'] ?? null,
         $userId,
+        $adminId,
     ]);
     $id = $pdo->lastInsertId();
     $row = $pdo->query("SELECT * FROM WhitelistDomains WHERE id = " . (int)$id)->fetch(PDO::FETCH_ASSOC);
@@ -45,7 +56,20 @@ function whitelist_add() {
 }
 
 function whitelist_update($id) {
-    requireAuth();
+    $user = requireAuth();
+    enforceSuperAdminReadOnly($user, 'update whitelist');
+    
+    $pdo = db();
+    list($adminClause, $adminParams) = adminIdFilter($user);
+    
+    // Verify permission
+    $checkParams = array_merge([$id], $adminParams);
+    $stmt = $pdo->prepare("SELECT id FROM WhitelistDomains WHERE id = ? $adminClause");
+    $stmt->execute($checkParams);
+    if (!$stmt->fetch()) {
+        jsonResp(['success' => false, 'error' => 'Entry not found or access denied'], 404);
+    }
+    
     $data = getJsonBody();
     $up = [];
     $vals = [];
@@ -71,14 +95,27 @@ function whitelist_update($id) {
     }
     if (!empty($up)) {
         $vals[] = $id;
-        db()->prepare("UPDATE WhitelistDomains SET " . implode(', ', $up) . " WHERE id = ?")->execute($vals);
+        $pdo->prepare("UPDATE WhitelistDomains SET " . implode(', ', $up) . " WHERE id = ?")->execute($vals);
     }
-    $row = db()->query("SELECT * FROM WhitelistDomains WHERE id = " . (int)$id)->fetch(PDO::FETCH_ASSOC);
+    $row = $pdo->query("SELECT * FROM WhitelistDomains WHERE id = " . (int)$id)->fetch(PDO::FETCH_ASSOC);
     jsonResp(['success' => true, 'data' => $row]);
 }
 
 function whitelist_delete($id) {
-    requireAuth();
-    db()->prepare("DELETE FROM WhitelistDomains WHERE id = ?")->execute([$id]);
+    $user = requireAuth();
+    enforceSuperAdminReadOnly($user, 'delete from whitelist');
+    
+    $pdo = db();
+    list($adminClause, $adminParams) = adminIdFilter($user);
+    
+    // Verify permission
+    $checkParams = array_merge([$id], $adminParams);
+    $stmt = $pdo->prepare("SELECT id FROM WhitelistDomains WHERE id = ? $adminClause");
+    $stmt->execute($checkParams);
+    if (!$stmt->fetch()) {
+        jsonResp(['success' => false, 'error' => 'Entry not found or access denied'], 404);
+    }
+    
+    $pdo->prepare("DELETE FROM WhitelistDomains WHERE id = ?")->execute([$id]);
     jsonResp(['success' => true, 'message' => 'Entry removed from whitelist']);
 }

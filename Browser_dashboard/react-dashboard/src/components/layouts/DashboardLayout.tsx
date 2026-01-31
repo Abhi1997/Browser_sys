@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatRole, getRoleBadgeClass } from '@/lib/auth';
-import { Bell, LogOut, User, Shield } from 'lucide-react';
+import { Bell, LogOut, User, Shield, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -83,6 +83,12 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
                   <Link to="/profile" className="flex items-center cursor-pointer">
                     <User className="mr-2 h-4 w-4" />
                     My profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/history" className="flex items-center cursor-pointer">
+                    <History className="mr-2 h-4 w-4" />
+                    My history
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

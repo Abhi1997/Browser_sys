@@ -76,6 +76,140 @@ function hashPassword($password) {
     return hash('sha256', $password);
 }
 
+/**
+ * Role Hierarchy & Data Isolation Helpers
+ * ========================================
+ * superuser:  View + modify ALL data across ALL admins (god mode)
+ * superadmin: Read-only view of all admins, can ONLY create new admins
+ * admin: Full operational authority for their own data
+ * teacher: Manages only their assigned students
+ * student: End user
+ */
+
+/**
+ * Check if user is superuser (ultimate superuser - can do everything)
+ */
+function isSuperuser($user) {
+    $role = strtolower($user['role'] ?? '');
+    return $role === 'superuser';
+}
+
+/**
+ * Check if user is superadmin (read-only oversight)
+ */
+function isSuperAdmin($user) {
+    $role = strtolower($user['role'] ?? '');
+    return $role === 'superadmin' || $role === 'super-admin';
+}
+
+/**
+ * Check if user can modify data (superadmin cannot modify, only view + create admin)
+ * Superuser can modify everything.
+ */
+function canModify($user) {
+    if (isSuperuser($user)) return true;
+    return !isSuperAdmin($user);
+}
+
+/**
+ * Get the admin_id for data isolation.
+ * - superuser: returns null (can see and modify all)
+ * - superadmin: returns null (can see all, but can't modify)
+ * - admin: returns their own user id
+ * - teacher: returns their admin_id from Users table
+ * - student: returns their admin_id from Students table
+ */
+function getUserAdminId($user) {
+    $role = strtolower($user['role'] ?? '');
+    $userId = $user['user_id'] ?? $user['userId'] ?? null;
+    
+    if (isSuperuser($user) || isSuperAdmin($user)) {
+        return null; // Can see all
+    }
+    
+    if ($role === 'admin') {
+        return $userId; // Admin's own data
+    }
+    
+    // Teacher or student: look up admin_id from DB
+    if (!$userId) return null;
+    
+    $pdo = db();
+    if ($role === 'teacher') {
+        $stmt = $pdo->prepare("SELECT admin_id FROM Users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? ($row['admin_id'] ?? null) : null;
+    }
+    
+    if ($role === 'student') {
+        $stmt = $pdo->prepare("SELECT admin_id FROM Students WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? ($row['admin_id'] ?? null) : null;
+    }
+    
+    return null;
+}
+
+/**
+ * Get the teacher_id for a teacher user (their own id), or null for others.
+ */
+function getUserTeacherId($user) {
+    $role = strtolower($user['role'] ?? '');
+    if ($role === 'teacher') {
+        return $user['user_id'] ?? $user['userId'] ?? null;
+    }
+    return null;
+}
+
+/**
+ * Enforce read-only for superadmin on modify operations.
+ * Call this at the start of any POST/PATCH/DELETE handler that superadmin should not use.
+ * Superuser bypasses this check (can modify everything).
+ */
+function enforceSuperAdminReadOnly($user, $action = 'modify') {
+    if (isSuperuser($user)) {
+        return; // Superuser can do everything
+    }
+    if (isSuperAdmin($user)) {
+        jsonResp([
+            'success' => false,
+            'error' => "Super admins can only view data and create new admins. Cannot $action."
+        ], 403);
+    }
+}
+
+/**
+ * Build WHERE clause for admin_id filtering.
+ * Returns [clause, params] where clause is " AND admin_id = ?" or "" for superadmin.
+ */
+function adminIdFilter($user, $tableAlias = '') {
+    $adminId = getUserAdminId($user);
+    if ($adminId === null) {
+        return ['', []]; // Superadmin sees all
+    }
+    $col = $tableAlias ? "$tableAlias.admin_id" : "admin_id";
+    return [" AND $col = ?", [$adminId]];
+}
+
+/**
+ * Build WHERE clause for teacher_id filtering (teachers see only their students).
+ * Returns [clause, params].
+ */
+function teacherIdFilter($user, $tableAlias = '') {
+    $role = strtolower($user['role'] ?? '');
+    if ($role !== 'teacher') {
+        return ['', []]; // Admins/superadmins don't filter by teacher_id
+    }
+    $teacherId = getUserTeacherId($user);
+    if (!$teacherId) {
+        return [" AND 1=0", []]; // No teacher_id = no results
+    }
+    $col = $tableAlias ? "$tableAlias.teacher_id" : "teacher_id";
+    return [" AND $col = ?", [$teacherId]];
+}
+
 /** Build JWT (header.payload.signature) for login response */
 function jwtEncode($payload) {
     $secret = getConfig()['jwt_secret'];

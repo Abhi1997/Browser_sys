@@ -1,6 +1,6 @@
 """
 Browser Mode Enforcement Engine
-Enforces Exam, Study, Restricted, and Free modes with URL filtering
+Enforces Cached (offline-only), Study, Restricted, and Free modes with URL filtering
 """
 
 import re
@@ -10,11 +10,11 @@ from authentication import Authentication
 
 class ModeEnforcement:
     MODES = {
-        "exam": {
-            "name": "Exam Mode",
-            "color": "#dc2626",  # Red
-            "icon": "🔒",
-            "description": "Strictest mode - only whitelisted educational sites allowed"
+        "cached": {
+            "name": "Cached Mode",
+            "color": "#7c3aed",  # Violet
+            "icon": "📁",
+            "description": "Offline only - only pre-cached sites can be viewed; no network. Cache managed by teachers/admins."
         },
         "study": {
             "name": "Study Mode",
@@ -67,20 +67,45 @@ class ModeEnforcement:
         except Exception:
             return False, "Invalid URL format"
         
-        # Free mode allows everything (but still logged)
+        # Time window: if student has active TimeWindows, allow only within allowed times
+        if student_id and self._outside_time_window(student_id):
+            if student_id:
+                self._log_violation(student_id, url, mode, "time_window_violation",
+                                    "Access attempted outside allowed time window")
+            return False, "Access not allowed outside your scheduled time window"
+
+        # Free mode: allow only after Google Safe Browsing check (if API key set)
         if mode == "free":
-            return True, "Free mode - all URLs allowed"
+            try:
+                from safe_browsing import is_url_safe
+                safe, reason = is_url_safe(url)
+                if not safe and student_id:
+                    self._log_violation(student_id, url, mode, "url_blocked", reason)
+                return safe, reason if not safe else "Free mode - URL checked and allowed"
+            except Exception as e:
+                # If safe_browsing module fails, allow URL to avoid breaking browsing
+                return True, f"Free mode - Safe Browsing check skipped: {e}"
         
-        # Check blacklist first (most restrictive)
-        if self._is_blacklisted(domain, mode):
+        # Check blacklist first (most restrictive) - filter by student's admin_id
+        if self._is_blacklisted(domain, mode, student_id):
             if student_id:
                 self._log_violation(student_id, url, mode, "url_blocked", 
                                   f"URL blocked: {domain} is in blacklist")
             return False, f"Blocked: {domain} is in blacklist for {mode} mode"
         
-        # Check whitelist
-        if mode in ("exam", "study", "restricted"):
-            if not self._is_whitelisted(domain, mode):
+        # Cached mode: only URLs that are in CachedSites (offline cache); no network
+        if mode == "cached":
+            path = self.auth.get_cached_site_path(url)
+            if not path:
+                if student_id:
+                    self._log_violation(student_id, url, mode, "url_blocked",
+                                        "URL not in offline cache; only cached sites allowed in cached mode")
+                return False, "Only cached offline sites can be viewed in Cached mode. No network."
+            return True, "Cached - load from offline"
+
+        # Check whitelist for study/restricted - filter by student's admin_id
+        if mode in ("study", "restricted"):
+            if not self._is_whitelisted(domain, mode, student_id):
                 if student_id:
                     self._log_violation(student_id, url, mode, "url_blocked",
                                       f"URL not whitelisted: {domain} not allowed in {mode} mode")
@@ -88,15 +113,31 @@ class ModeEnforcement:
         
         return True, "URL allowed"
     
-    def _is_whitelisted(self, domain, mode):
-        """Check if domain is whitelisted for the mode"""
+    def _is_whitelisted(self, domain, mode, student_id=None):
+        """Check if domain is whitelisted for the mode (filtered by admin_id if student has one)"""
         try:
             conn = self.auth._get_conn()
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id FROM WhitelistDomains 
-                WHERE domain=%s AND mode=%s AND is_active=1
-            """, (domain, mode))
+            
+            # Get admin_id for student if provided
+            admin_id = None
+            if student_id:
+                cursor.execute("SELECT admin_id FROM Students WHERE student_id=%s", (student_id,))
+                row = cursor.fetchone()
+                admin_id = row[0] if row else None
+            
+            # Filter by admin_id if student has one, otherwise global whitelist
+            if admin_id:
+                cursor.execute("""
+                    SELECT id FROM WhitelistDomains 
+                    WHERE domain=%s AND mode=%s AND is_active=1 AND admin_id=%s
+                """, (domain, mode, admin_id))
+            else:
+                cursor.execute("""
+                    SELECT id FROM WhitelistDomains 
+                    WHERE domain=%s AND mode=%s AND is_active=1
+                """, (domain, mode))
+            
             result = cursor.fetchone()
             cursor.close()
             conn.close()
@@ -105,15 +146,70 @@ class ModeEnforcement:
             print(f"Error checking whitelist: {e}")
             return False
     
-    def _is_blacklisted(self, domain, mode):
-        """Check if domain is blacklisted for the mode"""
+    def _outside_time_window(self, student_id):
+        """True if student has active time windows and current time is outside all of them."""
         try:
             conn = self.auth._get_conn()
             cursor = conn.cursor()
+            from datetime import datetime as dt, timedelta
+            now = dt.now()
+            weekday = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'][now.weekday()]
+            now_secs = now.hour * 3600 + now.minute * 60 + now.second
+
             cursor.execute("""
-                SELECT id FROM BlacklistDomains 
-                WHERE domain=%s AND mode=%s AND is_active=1
-            """, (domain, mode))
+                SELECT start_time, end_time FROM TimeWindows
+                WHERE student_id=%s AND is_active=1
+                  AND (day_of_week=%s OR day_of_week='all')
+            """, (student_id, weekday))
+            rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+
+            if not rows:
+                return False  # No windows = always allowed
+            for (start_time, end_time) in rows:
+                # MySQL may return TIME as timedelta (seconds since midnight) or time
+                def to_secs(t):
+                    if t is None:
+                        return 0
+                    if hasattr(t, 'total_seconds'):
+                        return int(t.total_seconds()) % (24 * 3600)
+                    if hasattr(t, 'hour'):
+                        return t.hour * 3600 + t.minute * 60 + t.second
+                    return 0
+                s, e = to_secs(start_time), to_secs(end_time)
+                if s <= now_secs <= e:
+                    return False  # Inside a window
+            return True  # Outside all windows
+        except Exception as e:
+            print(f"Error checking time window: {e}")
+            return False
+
+    def _is_blacklisted(self, domain, mode, student_id=None):
+        """Check if domain is blacklisted for the mode (filtered by admin_id if student has one)"""
+        try:
+            conn = self.auth._get_conn()
+            cursor = conn.cursor()
+            
+            # Get admin_id for student if provided
+            admin_id = None
+            if student_id:
+                cursor.execute("SELECT admin_id FROM Students WHERE student_id=%s", (student_id,))
+                row = cursor.fetchone()
+                admin_id = row[0] if row else None
+            
+            # Filter by admin_id if student has one, otherwise global blacklist
+            if admin_id:
+                cursor.execute("""
+                    SELECT id FROM BlacklistDomains 
+                    WHERE domain=%s AND mode=%s AND is_active=1 AND admin_id=%s
+                """, (domain, mode, admin_id))
+            else:
+                cursor.execute("""
+                    SELECT id FROM BlacklistDomains 
+                    WHERE domain=%s AND mode=%s AND is_active=1
+                """, (domain, mode))
+            
             result = cursor.fetchone()
             cursor.close()
             conn.close()
@@ -141,7 +237,7 @@ class ModeEnforcement:
             
             # Determine severity
             severity = "medium"
-            if mode == "exam":
+            if mode == "cached":
                 severity = "high"
             elif violation_type == "mode_bypass_attempt":
                 severity = "critical"
@@ -175,31 +271,36 @@ class ModeEnforcement:
             print(f"Error logging violation: {e}")
     
     def _check_escalation(self, student_id, user_id):
-        """Check if violations need escalation"""
+        """Record violations with warning triggers: first_violation, repeated_violation, critical."""
         try:
             conn = self.auth._get_conn()
             cursor = conn.cursor()
-            
-            # Count recent violations (last 24 hours)
+
             cursor.execute("""
                 SELECT COUNT(*) FROM Violations
                 WHERE student_id=%s AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
             """, (student_id,))
             count = cursor.fetchone()[0]
-            
-            if count >= 5:
-                # Escalate to admin
+
+            now = datetime.now()
+            # First violation: always record a warning trigger for visibility
+            if count == 1:
                 cursor.execute("""
                     INSERT INTO WarningTriggers (student_id, user_id, warning_type,
                                                violation_count, last_violation_at,
                                                escalated_to, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE
-                    violation_count=%s, last_violation_at=%s
-                """, (student_id, user_id, "repeated_violation", count, datetime.now(),
-                      "admin", datetime.now(), count, datetime.now()))
+                    VALUES (%s, %s, 'first_violation', 1, %s, 'teacher', %s)
+                """, (student_id, user_id, now, now))
                 conn.commit()
-            
+            elif count >= 5:
+                cursor.execute("""
+                    INSERT INTO WarningTriggers (student_id, user_id, warning_type,
+                                               violation_count, last_violation_at,
+                                               escalated_to, created_at)
+                    VALUES (%s, %s, 'repeated_violation', %s, %s, 'admin', %s)
+                """, (student_id, user_id, count, now, now))
+                conn.commit()
+
             cursor.close()
             conn.close()
         except Exception as e:

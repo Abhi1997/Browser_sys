@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS Users (
     username VARCHAR(100) NOT NULL UNIQUE,
     gmail VARCHAR(255) UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('student', 'teacher', 'admin', 'superadmin') NOT NULL,
+    role ENUM('student', 'teacher', 'admin', 'superadmin', 'superuser') NOT NULL,
+    admin_id INT DEFAULT NULL COMMENT 'For teachers: which admin they belong to',
     permissions TEXT,
     group_code VARCHAR(50),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -29,8 +30,10 @@ CREATE TABLE IF NOT EXISTS Users (
     INDEX idx_username (username),
     INDEX idx_gmail (gmail),
     INDEX idx_role (role),
+    INDEX idx_admin_id (admin_id),
     INDEX idx_teacher_status (teacher_approval_status),
-    FOREIGN KEY (approved_by) REFERENCES Users(id) ON DELETE SET NULL
+    FOREIGN KEY (approved_by) REFERENCES Users(id) ON DELETE SET NULL,
+    FOREIGN KEY (admin_id) REFERENCES Users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS Devices (
@@ -67,11 +70,13 @@ CREATE TABLE IF NOT EXISTS Sessions (
     dashboard_token VARCHAR(500),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NOT NULL,
+    last_activity_at DATETIME DEFAULT NULL,
     is_active TINYINT(1) DEFAULT 1,
     FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
     INDEX idx_token (token(255)),
-    INDEX idx_device_id (device_id)
+    INDEX idx_device_id (device_id),
+    INDEX idx_user_activity (user_id, last_activity_at)
 );
 
 CREATE TABLE IF NOT EXISTS DashboardTokens (
@@ -95,8 +100,10 @@ CREATE TABLE IF NOT EXISTS Students (
     id INT AUTO_INCREMENT PRIMARY KEY,
     student_id VARCHAR(100) NOT NULL UNIQUE,
     user_id INT NOT NULL,
+    teacher_id INT DEFAULT NULL COMMENT 'Assigned teacher (by admin)',
+    admin_id INT DEFAULT NULL COMMENT 'Which admin this student belongs to',
     gmail VARCHAR(255) NOT NULL,
-    assigned_mode ENUM('exam', 'study', 'restricted', 'free') DEFAULT 'restricted',
+    assigned_mode ENUM('cached', 'study', 'restricted', 'free') DEFAULT 'restricted',
     violation_count INT DEFAULT 0,
     device_id VARCHAR(255),
     ip_address VARCHAR(45),
@@ -105,7 +112,11 @@ CREATE TABLE IF NOT EXISTS Students (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     is_active TINYINT(1) DEFAULT 1,
     FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES Users(id) ON DELETE SET NULL,
+    FOREIGN KEY (admin_id) REFERENCES Users(id) ON DELETE SET NULL,
     INDEX idx_user_id (user_id),
+    INDEX idx_teacher_id (teacher_id),
+    INDEX idx_admin_id (admin_id),
     INDEX idx_mode (assigned_mode),
     INDEX idx_device_id (device_id)
 );
@@ -124,8 +135,8 @@ CREATE TABLE IF NOT EXISTS TimeWindows (
 CREATE TABLE IF NOT EXISTS ModeHistory (
     id INT AUTO_INCREMENT PRIMARY KEY,
     student_id VARCHAR(100) NOT NULL,
-    old_mode ENUM('exam', 'study', 'restricted', 'free'),
-    new_mode ENUM('exam', 'study', 'restricted', 'free') NOT NULL,
+    old_mode ENUM('cached', 'study', 'restricted', 'free'),
+    new_mode ENUM('cached', 'study', 'restricted', 'free') NOT NULL,
     changed_by INT NOT NULL,
     changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     reason TEXT,
@@ -138,27 +149,33 @@ CREATE TABLE IF NOT EXISTS ModeHistory (
 CREATE TABLE IF NOT EXISTS WhitelistDomains (
     id INT AUTO_INCREMENT PRIMARY KEY,
     domain VARCHAR(255) NOT NULL,
-    mode ENUM('exam', 'study', 'restricted', 'free') NOT NULL,
+    mode ENUM('cached', 'study', 'restricted', 'free') NOT NULL,
     description TEXT,
     added_by INT,
+    admin_id INT DEFAULT NULL COMMENT 'Data isolation per admin',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_active TINYINT(1) DEFAULT 1,
     FOREIGN KEY (added_by) REFERENCES Users(id) ON DELETE SET NULL,
+    FOREIGN KEY (admin_id) REFERENCES Users(id) ON DELETE CASCADE,
     INDEX idx_domain (domain),
-    INDEX idx_mode (mode)
+    INDEX idx_mode (mode),
+    INDEX idx_admin_id (admin_id)
 );
 
 CREATE TABLE IF NOT EXISTS BlacklistDomains (
     id INT AUTO_INCREMENT PRIMARY KEY,
     domain VARCHAR(255) NOT NULL,
-    mode ENUM('exam', 'study', 'restricted', 'free') NOT NULL,
+    mode ENUM('cached', 'study', 'restricted', 'free') NOT NULL,
     reason TEXT,
     added_by INT,
+    admin_id INT DEFAULT NULL COMMENT 'Data isolation per admin',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_active TINYINT(1) DEFAULT 1,
     FOREIGN KEY (added_by) REFERENCES Users(id) ON DELETE SET NULL,
+    FOREIGN KEY (admin_id) REFERENCES Users(id) ON DELETE CASCADE,
     INDEX idx_domain (domain),
-    INDEX idx_mode (mode)
+    INDEX idx_mode (mode),
+    INDEX idx_admin_id (admin_id)
 );
 
 -- ==========================================================
@@ -171,7 +188,7 @@ CREATE TABLE IF NOT EXISTS ActivityLogs (
     user_id INT NOT NULL,
     url VARCHAR(2048) NOT NULL,
     domain VARCHAR(255),
-    mode ENUM('exam', 'study', 'restricted', 'free') NOT NULL,
+    mode ENUM('cached', 'study', 'restricted', 'free') NOT NULL,
     visit_duration INT DEFAULT 0,
     visit_start DATETIME NOT NULL,
     visit_end DATETIME,
@@ -198,7 +215,7 @@ CREATE TABLE IF NOT EXISTS Violations (
     ) NOT NULL,
     description TEXT NOT NULL,
     attempted_url VARCHAR(2048),
-    current_mode ENUM('exam', 'study', 'restricted', 'free'),
+    current_mode ENUM('cached', 'study', 'restricted', 'free'),
     device_id VARCHAR(255),
     ip_address VARCHAR(45),
     mac_address VARCHAR(17),
@@ -280,7 +297,7 @@ CREATE TABLE IF NOT EXISTS WarningTriggers (
 CREATE TABLE IF NOT EXISTS DashboardLogs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    role ENUM('teacher', 'admin', 'superadmin') NOT NULL,
+    role ENUM('teacher', 'admin', 'superadmin', 'superuser') NOT NULL,
     action VARCHAR(255) NOT NULL,
     endpoint VARCHAR(255),
     ip_address VARCHAR(45),
@@ -290,11 +307,46 @@ CREATE TABLE IF NOT EXISTS DashboardLogs (
     INDEX idx_user_role_time (user_id, role, created_at)
 );
 
+CREATE TABLE IF NOT EXISTS BrowsingHistory (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    url VARCHAR(2048) NOT NULL,
+    page_title VARCHAR(512) DEFAULT NULL,
+    visited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    device_id VARCHAR(255) DEFAULT NULL,
+    INDEX idx_user_visited (user_id, visited_at),
+    INDEX idx_user_id (user_id),
+    FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS CachedSites (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    url VARCHAR(2048) NOT NULL,
+    title VARCHAR(512) DEFAULT NULL,
+    file_path VARCHAR(1024) NOT NULL COMMENT 'Relative path under cache base dir',
+    added_by INT NOT NULL,
+    admin_id INT DEFAULT NULL COMMENT 'Data isolation per admin',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_active TINYINT(1) DEFAULT 1,
+    FOREIGN KEY (added_by) REFERENCES Users(id) ON DELETE CASCADE,
+    FOREIGN KEY (admin_id) REFERENCES Users(id) ON DELETE CASCADE,
+    INDEX idx_url (url(255)),
+    INDEX idx_added_by (added_by),
+    INDEX idx_admin_id (admin_id)
+);
+
 -- ==========================================================
 -- DEFAULT SUPERADMIN (NO PASSWORD SET HERE)
 -- Password must be created/reset via backend using bcrypt
 -- ==========================================================
 
+-- Default superadmin user (password must be reset via backend)
 INSERT INTO Users (username, password_hash, role, is_active)
 VALUES ('admin', 'RESET_REQUIRED', 'superadmin', 1)
+ON DUPLICATE KEY UPDATE username = username;
+
+-- Default superuser user (ultimate superuser - password must be reset via backend)
+INSERT INTO Users (username, password_hash, role, is_active)
+VALUES ('superuser', 'RESET_REQUIRED', 'superuser', 1)
 ON DUPLICATE KEY UPDATE username = username;

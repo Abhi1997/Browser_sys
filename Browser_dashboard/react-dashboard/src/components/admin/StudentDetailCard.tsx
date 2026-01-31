@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, User, Globe, Lock, BookOpen, AlertCircle, Clock, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, User, Globe, Folder, BookOpen, AlertCircle, Clock, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,20 +10,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useActivity, useViolations, useUpdateStudentMode } from '@/hooks/useDashboardData';
+import { useActivity, useViolations, useStudentHistory, useUpdateStudentMode, useTeachers, useAssignStudentToTeacher } from '@/hooks/useDashboardData';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 const MODE_COLORS: Record<string, string> = {
-  exam: 'bg-destructive/20 text-destructive border-destructive/30',
+  cached: 'bg-violet-500/20 text-violet-700 border-violet-500/30',
   study: 'bg-primary/20 text-primary border-primary/30',
   restricted: 'bg-warning/20 text-warning border-warning/30',
   free: 'bg-success/20 text-success border-success/30',
 };
 
 const MODE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  exam: Lock,
+  cached: Folder,
   study: BookOpen,
   restricted: AlertCircle,
   free: Globe,
@@ -40,6 +40,8 @@ interface StudentDetailCardProps {
     mode?: string;
     assigned_mode?: string;
     is_active?: boolean;
+    teacher_id?: string | number;
+    teacherName?: string;
   };
 }
 
@@ -52,7 +54,13 @@ export function StudentDetailCard({ student }: StudentDetailCardProps) {
 
   const { data: activity, isLoading: activityLoading } = useActivity(studentId, 50);
   const { data: violations, isLoading: violationsLoading } = useViolations(studentId, 50);
+  const { data: browsingHistory, isLoading: historyLoading } = useStudentHistory(studentId, 50);
+  const { data: teachers } = useTeachers();
   const updateMode = useUpdateStudentMode();
+  const assignTeacher = useAssignStudentToTeacher();
+  
+  const isAdmin = user?.role === 'admin';
+  const currentTeacherId = String(student.teacher_id ?? '');
 
   const handleModeChange = (newMode: string) => {
     if (user?.id && studentId) {
@@ -60,6 +68,15 @@ export function StudentDetailCard({ student }: StudentDetailCardProps) {
         studentId,
         mode: newMode,
         changedBy: parseInt(user.id),
+      });
+    }
+  };
+  
+  const handleTeacherChange = (teacherId: string) => {
+    if (studentId) {
+      assignTeacher.mutate({
+        studentId,
+        teacherId: teacherId === 'unassigned' ? null : teacherId,
       });
     }
   };
@@ -90,9 +107,37 @@ export function StudentDetailCard({ student }: StudentDetailCardProps) {
               <ModeIcon className="h-3 w-3 mr-1" />
               {mode?.toUpperCase() ?? 'N/A'}
             </Badge>
+            {student.teacherName && (
+              <Badge variant="secondary" className="shrink-0">
+                Teacher: {student.teacherName}
+              </Badge>
+            )}
           </div>
-          <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-            <span className="text-sm text-muted-foreground">Set mode:</span>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap" onClick={(e) => e.stopPropagation()}>
+            {/* Admin can assign teacher */}
+            {isAdmin && teachers && teachers.length > 0 && (
+              <>
+                <span className="text-sm text-muted-foreground">Teacher:</span>
+                <Select
+                  value={currentTeacherId || 'unassigned'}
+                  onValueChange={handleTeacherChange}
+                  disabled={assignTeacher.isPending}
+                >
+                  <SelectTrigger className="w-[130px] h-9">
+                    <SelectValue placeholder="Assign..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {(teachers as any[]).map((t: any) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        {t.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+            <span className="text-sm text-muted-foreground">Mode:</span>
             <Select
               value={mode}
               onValueChange={handleModeChange}
@@ -105,7 +150,7 @@ export function StudentDetailCard({ student }: StudentDetailCardProps) {
                 <SelectItem value="free">Free</SelectItem>
                 <SelectItem value="restricted">Restricted</SelectItem>
                 <SelectItem value="study">Study</SelectItem>
-                <SelectItem value="exam">Exam</SelectItem>
+                <SelectItem value="cached">Cached</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -142,28 +187,26 @@ export function StudentDetailCard({ student }: StudentDetailCardProps) {
                 )}
               </div>
             </div>
-            {/* History (site access) */}
+            {/* Browsing history (per-student) */}
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
                 <Clock className="h-4 w-4 text-primary" />
-                History (site access)
+                Browsing history ({browsingHistory?.length ?? 0})
               </h4>
               <div className="rounded-lg border bg-card p-3 max-h-48 overflow-y-auto">
-                {activityLoading ? (
+                {historyLoading ? (
                   <Skeleton className="h-20 w-full" />
-                ) : !activity?.length ? (
-                  <p className="text-sm text-muted-foreground">No activity yet</p>
+                ) : !browsingHistory?.length ? (
+                  <p className="text-sm text-muted-foreground">No browsing history yet</p>
                 ) : (
                   <ul className="space-y-2 text-sm">
-                    {(activity as any[]).map((a: any) => (
-                      <li key={a.id} className="flex items-start gap-2 border-b border-border/50 pb-2 last:border-0">
+                    {(browsingHistory as any[]).map((h: any) => (
+                      <li key={h.id} className="flex items-start gap-2 border-b border-border/50 pb-2 last:border-0">
                         <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-medium truncate">{a.url ?? a.domain ?? '—'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {a.visitStart ?? a.createdAt ?? a.timestamp ?? ''}
-                            {a.duration != null ? ` · ${a.duration}s` : ''}
-                          </p>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{h.pageTitle || h.url || '—'}</p>
+                          <p className="text-xs text-muted-foreground truncate">{h.url}</p>
+                          <p className="text-xs text-muted-foreground">{h.visitedAt ? new Date(h.visitedAt).toLocaleString() : ''}</p>
                         </div>
                       </li>
                     ))}

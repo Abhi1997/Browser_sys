@@ -149,6 +149,15 @@ class DashboardWindow(QDialog):
         
         # Set window icon
         self.setWindowIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
+
+    def showEvent(self, event):
+        """Log dashboard open by user (for admin dashboard logs)."""
+        super().showEvent(event)
+        try:
+            if self.auth and self.user_id and self.user_role:
+                self.auth.log_dashboard_open(self.user_id, self.user_role, action="dashboard_open")
+        except Exception as e:
+            print(f"Error logging dashboard open: {e}")
     
     def _generate_dashboard_token(self):
         """Generate JWT token for dashboard authentication"""

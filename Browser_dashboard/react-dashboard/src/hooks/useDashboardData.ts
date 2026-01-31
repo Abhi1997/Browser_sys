@@ -7,9 +7,19 @@ import {
   getViolations,
   getWhitelist,
   getBlacklist,
+  getCachedSites,
+  deleteCachedSite,
   getChangeLogs,
+  getDashboardLogs,
+  getHistory,
+  getStudentHistory,
+  getWarningTriggers,
+  getSessions,
   getAdmins,
+  getTeachers,
   setStudentMode,
+  assignStudentToTeacher,
+  createAdmin,
   toggleUserStatus,
   createUser,
   deleteUser,
@@ -139,6 +149,124 @@ export function useChangeLogs(limit: number = 100) {
   });
 }
 
+// Dashboard logs query (who opened dashboard when - admin only)
+export function useDashboardLogs(limit: number = 100) {
+  return useQuery({
+    queryKey: ['dashboardLogs', limit],
+    queryFn: async () => {
+      const response = await getDashboardLogs(limit);
+      if (!response.success) {
+        console.warn('Failed to fetch dashboard logs:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 30000,
+    retry: 2,
+  });
+}
+
+// Own browsing history (for My History page)
+export function useHistory(limit: number = 100) {
+  return useQuery({
+    queryKey: ['history', limit],
+    queryFn: async () => {
+      const response = await getHistory(limit);
+      if (!response.success) {
+        console.warn('Failed to fetch history:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 60000,
+    retry: 2,
+  });
+}
+
+// Student browsing history (for teachers viewing a student's tab)
+export function useStudentHistory(studentId: string | undefined, limit: number = 100) {
+  return useQuery({
+    queryKey: ['studentHistory', studentId, limit],
+    queryFn: async () => {
+      if (!studentId) return [];
+      const response = await getStudentHistory(studentId, limit);
+      if (!response.success) {
+        console.warn('Failed to fetch student history:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    enabled: !!studentId,
+    refetchInterval: 60000,
+    retry: 2,
+  });
+}
+
+// Warning triggers (violations + escalation - teacher/admin)
+export function useWarningTriggers(limit: number = 100, studentId?: string) {
+  return useQuery({
+    queryKey: ['warningTriggers', limit, studentId],
+    queryFn: async () => {
+      const response = await getWarningTriggers(limit, studentId);
+      if (!response.success) {
+        console.warn('Failed to fetch warning triggers:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 30000,
+    retry: 2,
+  });
+}
+
+// Cached sites (teachers/admins: list and delete; add via Qt app "Cache this page")
+export function useCachedSites() {
+  return useQuery({
+    queryKey: ['cachedSites'],
+    queryFn: async () => {
+      const response = await getCachedSites();
+      if (!response.success) {
+        console.warn('Failed to fetch cached sites:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 30000,
+    retry: 2,
+  });
+}
+
+export function useDeleteCachedSite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteCachedSite(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cachedSites'] });
+      toast({ title: 'Cached site removed' });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Failed to remove cached site', description: err.message, variant: 'destructive' });
+    },
+  });
+}
+
+// Session usage (browser usage per user/session - admin, for ML)
+export function useSessions(limit: number = 100) {
+  return useQuery({
+    queryKey: ['sessions', limit],
+    queryFn: async () => {
+      const response = await getSessions(limit);
+      if (!response.success) {
+        console.warn('Failed to fetch sessions:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 60000,
+    retry: 2,
+  });
+}
+
 // Admins list query (for super-admin)
 export function useAdmins() {
   return useQuery({
@@ -153,6 +281,55 @@ export function useAdmins() {
     },
     refetchInterval: 30000,
     retry: 2,
+  });
+}
+
+// Teachers list (for admin to assign students)
+export function useTeachers() {
+  return useQuery({
+    queryKey: ['teachers'],
+    queryFn: async () => {
+      const response = await getTeachers();
+      if (!response.success) {
+        console.warn('Failed to fetch teachers:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 30000,
+    retry: 2,
+  });
+}
+
+// Assign student to teacher (admin only)
+export function useAssignStudentToTeacher() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, teacherId }: { studentId: string; teacherId: string | null }) =>
+      assignStudentToTeacher(studentId, teacherId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      toast({ title: 'Student assigned to teacher' });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Failed to assign student', description: err.message, variant: 'destructive' });
+    },
+  });
+}
+
+// Create admin (superadmin only)
+export function useCreateAdmin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { username: string; password: string; email: string }) => createAdmin(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admins'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast({ title: 'Admin created successfully' });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Failed to create admin', description: err.message, variant: 'destructive' });
+    },
   });
 }
 

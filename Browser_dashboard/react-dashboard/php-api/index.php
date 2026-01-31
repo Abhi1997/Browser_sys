@@ -26,9 +26,16 @@ $pathAliases = [
     'stats' => 'api/stats',
     'students' => 'api/students',
     'violations' => 'api/violations',
+    'history' => 'api/history',
+    'dashboard-logs' => 'api/dashboard-logs',
+    'sessions' => 'api/sessions',
+    'warning-triggers' => 'api/warning-triggers',
     'users' => 'api/users',
     'whitelist' => 'api/whitelist',
     'blacklist' => 'api/blacklist',
+    'cached-sites' => 'api/cached-sites',
+    'teachers' => 'api/teachers',
+    'admins' => 'api/admins',
 ];
 if (isset($pathAliases[$path])) {
     $path = $pathAliases[$path];
@@ -63,7 +70,13 @@ $routes = [
         'api/activity' => ['activity_list', 'activity'],
         'api/violations' => ['violations_list', 'violations'],
         'api/change-logs' => ['change_logs', 'stats'],
+        'api/dashboard-logs' => ['dashboard_logs', 'stats'],
+        'api/sessions' => ['sessions_list', 'stats'],
+        'api/warning-triggers' => ['warnings_list', 'warnings'],
+        'api/cached-sites' => ['cached_sites_list', 'cached_sites'],
+        'api/history' => ['history_list', 'history'],
         'api/admins' => ['admins_list', 'users'],
+        'api/teachers' => ['teachers_list', 'users'],
         'notifications' => ['notifications_list', 'notifications'],
         'health' => ['health', 'stats'],
         'api/debug' => ['debug', 'stats'],
@@ -77,9 +90,11 @@ $routes = [
 $paramRoutes = [
     'GET' => [
         'stats/admin/([^/]+)' => ['stats_admin', 'stats'],
+        'api/students/([^/]+)/history' => ['history_list_student', 'history'],
     ],
     'POST' => [
         'api/students/([^/]+)/mode' => ['students_set_mode', 'students'],
+        'api/students/([^/]+)/assign-teacher' => ['students_assign_teacher', 'students'],
     ],
     'PATCH' => [
         'api/users/([^/]+)' => ['users_update', 'users'],
@@ -92,6 +107,7 @@ $paramRoutes = [
         'api/users/([^/]+)' => ['users_delete', 'users'],
         'api/whitelist/([^/]+)' => ['whitelist_delete', 'whitelist'],
         'api/blacklist/([^/]+)' => ['blacklist_delete', 'blacklist'],
+        'api/cached-sites/([^/]+)' => ['cached_sites_delete', 'cached_sites'],
     ],
 ];
 

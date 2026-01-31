@@ -52,7 +52,7 @@ DB_CONFIG = {
 }
 
 # --- Sample Data ---
-SAMPLE_STUDENTS = [{"username": f"student{i}", "gmail": f"student{i}@example.com", "mode": random.choice(["exam","study","restricted","free"])} for i in range(1,11)]
+SAMPLE_STUDENTS = [{"username": f"student{i}", "gmail": f"student{i}@example.com", "mode": random.choice(["cached","study","restricted","free"])} for i in range(1,11)]
 SAMPLE_TEACHERS = [{"username": f"teacher{i}", "gmail": f"teacher{i}@example.com"} for i in range(1,4)]
 SAMPLE_ADMINS = [{"username": "admin", "gmail": "admin@example.com"}]
 
@@ -141,7 +141,7 @@ def populate_whitelist_blacklist():
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM Users WHERE role='admin' LIMIT 1")
     admin_id = cursor.fetchone()[0] if cursor.fetchone() else 1
-    modes = ["exam","study","restricted","free"]
+    modes = ["cached","study","restricted","free"]
     for d in EDU_DOMAINS:
         for m in modes:
             try:
@@ -150,7 +150,7 @@ def populate_whitelist_blacklist():
             except mysql.connector.IntegrityError:
                 pass
     for d in BLOCKED_DOMAINS:
-        for m in ["exam","study","restricted"]:
+        for m in ["cached","study","restricted"]:
             try:
                 cursor.execute("INSERT INTO BlacklistDomains (domain, mode, reason, added_by, is_active, created_at) VALUES (%s,%s,%s,%s,%s,%s)",
                                (d,m,f"Blocked in {m}",admin_id,1,datetime.now()))
@@ -247,7 +247,7 @@ def populate_mode_history():
     cursor = conn.cursor()
     cursor.execute("SELECT id, assigned_mode FROM Students")
     students = cursor.fetchall()
-    modes = ["exam","study","restricted","free"]
+    modes = ["cached","study","restricted","free"]
     for student_id, current_mode in students:
         for _ in range(random.randint(1,5)):
             new_mode = random.choice([m for m in modes if m != current_mode])
