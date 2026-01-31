@@ -72,5 +72,9 @@ Thumbs.db
 # Lock files for pip
 pip-freeze.txt
 
+# Large zip files
+*.zip
+Browser_sys.zip
+
 # New folder (temporary)
 New\ folder/
