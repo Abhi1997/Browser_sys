@@ -29,9 +29,9 @@ EduBrowser is a secure educational browser application with role-based access co
 1. Log in to Hostinger hPanel
 2. Go to **Databases** → **MySQL Databases**
 3. Your database credentials:
-   - **Database Name**: `u976383844_dces`
-   - **Username**: `u976383844_abhi097`
-   - **Password**: `!nN0v@tion113`
+   - **Database Name**: 
+   - **Username**: 
+   - **Password**:
    - **Host**: `localhost` (for Hostinger basic hosting)
 
 ### Step 1.2: Enable Remote Access (Important)
@@ -54,11 +54,11 @@ EduBrowser is a secure educational browser application with role-based access co
 
 1. Create `.env` file in project root:
    ```env
-   DB_HOST=localhost
-   DB_PORT=3306
-   DB_USER=u976383844_abhi097
-   DB_PASSWORD=!nN0v@tion113
-   DB_NAME=u976383844_dces
+   DB_HOST=
+   DB_PORT=
+   DB_USER=
+   DB_PASSWORD=
+   DB_NAME=
    ```
 
 2. Run setup scripts:
@@ -110,9 +110,9 @@ Create `.env` file in project root:
 ```env
 DB_HOST=localhost
 DB_PORT=3306
-DB_USER=u976383844_abhi097
-DB_PASSWORD=!nN0v@tion113
-DB_NAME=u976383844_dces
+DB_USER=
+DB_PASSWORD=
+DB_NAME=
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 ```
 
@@ -169,10 +169,10 @@ The app will:
 
 ```env
 DB_HOST=localhost
-DB_PORT=3306
-DB_USER=u976383844_abhi097
-DB_PASSWORD=!nN0v@tion113
-DB_NAME=u976383844_dces
+DB_PORT=
+DB_USER=
+DB_PASSWORD=
+DB_NAME=
 JWT_SECRET=your-secret-key-here
 ```
 
@@ -324,11 +324,11 @@ Create a `.env` file in the project root directory (or update existing one):
 
 ```env
 # Database Configuration
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=u976383844_abhi097
-DB_PASSWORD=!nN0v@tion113
-DB_NAME=u976383844_dces
+DB_HOST=lhost
+DB_PORT=
+DB_USER=
+DB_PASSWORD=
+DB_NAME=
 
 # Dashboard Configuration
 DASHBOARD_URL=https://api.abhinavpaudel.com
