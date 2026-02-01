@@ -25,7 +25,6 @@ Browser_dashboard/react-dashboard/dist/
 Browser_dashboard/react-dashboard/.vite/
 Browser_dashboard/react-dashboard/.env
 Browser_dashboard/react-dashboard/.env.production
-Browser_dashboard/react-dashboard/backend/.env
 
 # Qt App
 qtapp/node_modules/

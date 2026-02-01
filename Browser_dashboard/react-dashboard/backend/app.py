@@ -27,14 +27,23 @@ CORS(app, origins=[
 ])
 
 # Configuration
-JWT_SECRET = os.getenv('JWT_SECRET', 'your-super-secret-jwt-key-change-this-in-production')
+JWT_SECRET = os.getenv('JWT_SECRET')
+if not JWT_SECRET:
+    raise ValueError("JWT_SECRET must be set in .env file")
+
 DB_CONFIG = {
-    'host': os.getenv('DB_HOST', 'srv1882.hstgr.io'),
-    'user': os.getenv('DB_USER', 'u976383844_abhi097'),
-    'password': os.getenv('DB_PASSWORD', '!nN0v@tion113'),
-    'database': os.getenv('DB_NAME', 'u976383844_dces'),
-    'port': int(os.getenv('DB_PORT', 3306))
+    'host': os.getenv('DB_HOST'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'database': os.getenv('DB_NAME'),
+    'port': int(os.getenv('DB_PORT', '3306'))
 }
+
+# Validate required database credentials
+required_db_fields = ['host', 'user', 'password', 'database']
+for field in required_db_fields:
+    if not DB_CONFIG.get(field):
+        raise ValueError(f"DB_{field.upper()} must be set in .env file")
 
 def get_db_connection():
     """Get database connection"""

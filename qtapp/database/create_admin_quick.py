@@ -24,11 +24,15 @@ except ImportError:
 # ----------------------------
 # Database Configuration
 # ----------------------------
-DB_HOST = os.getenv("DB_HOST", "srv1882.hstgr.io")
-DB_USER = os.getenv("DB_USER", "u976383844_abhi097")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "!nN0v@tion113")
-DB_NAME = os.getenv("DB_NAME", "u976383844_dces")
-DB_PORT = int(os.getenv("DB_PORT", 3306))
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
+DB_PORT = int(os.getenv("DB_PORT", "3306"))
+
+# Validate required database credentials
+if not all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
+    raise ValueError("DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME must be set in .env file")
 
 DB_CONFIG = {
     "host": DB_HOST,
