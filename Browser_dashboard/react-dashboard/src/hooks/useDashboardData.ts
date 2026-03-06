@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  getStatsOverview, 
-  getUsers, 
-  getStudents, 
-  getActivity, 
+import {
+  getStatsOverview,
+  getUsers,
+  getStudents,
+  getActivity,
   getViolations,
   getWhitelist,
   getBlacklist,
@@ -13,6 +13,8 @@ import {
   getDashboardLogs,
   getHistory,
   getStudentHistory,
+  getBookmarks,
+  getStudentBookmarks,
   getWarningTriggers,
   getSessions,
   getAdmins,
@@ -202,6 +204,42 @@ export function useStudentHistory(studentId: string | undefined, limit: number =
   });
 }
 
+// Own bookmarks
+export function useBookmarks() {
+  return useQuery({
+    queryKey: ['bookmarks'],
+    queryFn: async () => {
+      const response = await getBookmarks();
+      if (!response.success) {
+        console.warn('Failed to fetch bookmarks:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 60000,
+    retry: 2,
+  });
+}
+
+// Student bookmarks (for teachers)
+export function useStudentBookmarks(studentId: string | undefined) {
+  return useQuery({
+    queryKey: ['studentBookmarks', studentId],
+    queryFn: async () => {
+      if (!studentId) return [];
+      const response = await getStudentBookmarks(studentId);
+      if (!response.success) {
+        console.warn('Failed to fetch student bookmarks:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    enabled: !!studentId,
+    refetchInterval: 60000,
+    retry: 2,
+  });
+}
+
 // Warning triggers (violations + escalation - teacher/admin)
 export function useWarningTriggers(limit: number = 100, studentId?: string) {
   return useQuery({
@@ -336,7 +374,7 @@ export function useCreateAdmin() {
 // Mutations
 export function useUpdateStudentMode() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ studentId, mode, changedBy }: { studentId: string; mode: string; changedBy: number }) => {
       const response = await setStudentMode(studentId, mode, changedBy);
@@ -366,7 +404,7 @@ export function useUpdateStudentMode() {
 
 export function useToggleUserStatus() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (userId: string) => {
       const response = await toggleUserStatus(userId);
@@ -395,7 +433,7 @@ export function useToggleUserStatus() {
 
 export function useCreateUser() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (user: Partial<any>) => {
       const response = await createUser(user);
@@ -424,7 +462,7 @@ export function useCreateUser() {
 
 export function useDeleteUser() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (userId: string) => {
       const response = await deleteUser(userId);
@@ -470,7 +508,7 @@ export function useWhitelist() {
 
 export function useAddToWhitelist() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (entry: Partial<any>) => {
       const response = await addToWhitelist(entry);
@@ -498,7 +536,7 @@ export function useAddToWhitelist() {
 
 export function useRemoveFromWhitelist() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
       const response = await removeFromWhitelist(id);
@@ -527,7 +565,7 @@ export function useRemoveFromWhitelist() {
 
 export function useUpdateWhitelistEntry() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<any> }) => {
       const response = await updateWhitelistEntry(id, updates);
@@ -572,7 +610,7 @@ export function useBlacklist() {
 
 export function useAddToBlacklist() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (entry: Partial<any>) => {
       const response = await addToBlacklist(entry);
@@ -600,7 +638,7 @@ export function useAddToBlacklist() {
 
 export function useRemoveFromBlacklist() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
       const response = await removeFromBlacklist(id);
@@ -629,7 +667,7 @@ export function useRemoveFromBlacklist() {
 
 export function useUpdateBlacklistEntry() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<any> }) => {
       const response = await updateBlacklistEntry(id, updates);

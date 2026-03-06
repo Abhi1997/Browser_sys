@@ -37,6 +37,7 @@ $pathAliases = [
     'cached-sites' => 'api/cached-sites',
     'teachers' => 'api/teachers',
     'admins' => 'api/admins',
+    'bookmarks' => 'api/bookmarks',
 ];
 if (isset($pathAliases[$path])) {
     $path = $pathAliases[$path];
@@ -59,6 +60,7 @@ $routes = [
         'api/users' => ['users_create', 'users'],
         'api/whitelist' => ['whitelist_add', 'whitelist'],
         'api/blacklist' => ['blacklist_add', 'blacklist'],
+        'api/bookmarks' => ['bookmarks_add', 'bookmarks'],
         'export/db' => ['export_db', 'export'],
     ],
     'GET' => [
@@ -79,6 +81,7 @@ $routes = [
         'api/history' => ['history_list', 'history'],
         'api/admins' => ['admins_list', 'users'],
         'api/teachers' => ['teachers_list', 'users'],
+        'api/bookmarks' => ['bookmarks_list', 'bookmarks'],
         'notifications' => ['notifications_list', 'notifications'],
         'health' => ['health', 'stats'],
         'api/debug' => ['debug', 'stats'],
@@ -93,6 +96,7 @@ $paramRoutes = [
     'GET' => [
         'stats/admin/([^/]+)' => ['stats_admin', 'stats'],
         'api/students/([^/]+)/history' => ['history_list_student', 'history'],
+        'api/students/([^/]+)/bookmarks' => ['bookmarks_list_student', 'bookmarks'],
     ],
     'POST' => [
         'api/students/([^/]+)/mode' => ['students_set_mode', 'students'],
@@ -110,6 +114,7 @@ $paramRoutes = [
         'api/whitelist/([^/]+)' => ['whitelist_delete', 'whitelist'],
         'api/blacklist/([^/]+)' => ['blacklist_delete', 'blacklist'],
         'api/cached-sites/([^/]+)' => ['cached_sites_delete', 'cached_sites'],
+        'api/bookmarks' => ['bookmarks_remove', 'bookmarks'],
     ],
 ];
 

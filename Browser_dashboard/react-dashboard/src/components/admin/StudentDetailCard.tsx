@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, User, Globe, Folder, BookOpen, AlertCircle, Clock, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, User, Globe, Folder, BookOpen, AlertCircle, Clock, ExternalLink, Bookmark } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useActivity, useViolations, useStudentHistory, useUpdateStudentMode, useTeachers, useAssignStudentToTeacher } from '@/hooks/useDashboardData';
+import { useActivity, useViolations, useStudentHistory, useStudentBookmarks, useUpdateStudentMode, useTeachers, useAssignStudentToTeacher } from '@/hooks/useDashboardData';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -55,10 +55,11 @@ export function StudentDetailCard({ student }: StudentDetailCardProps) {
   const { data: activity, isLoading: activityLoading } = useActivity(studentId, 50);
   const { data: violations, isLoading: violationsLoading } = useViolations(studentId, 50);
   const { data: browsingHistory, isLoading: historyLoading } = useStudentHistory(studentId, 50);
+  const { data: bookmarks, isLoading: bookmarksLoading } = useStudentBookmarks(studentId);
   const { data: teachers } = useTeachers();
   const updateMode = useUpdateStudentMode();
   const assignTeacher = useAssignStudentToTeacher();
-  
+
   const isAdmin = user?.role === 'admin';
   const currentTeacherId = String(student.teacher_id ?? '');
 
@@ -71,7 +72,7 @@ export function StudentDetailCard({ student }: StudentDetailCardProps) {
       });
     }
   };
-  
+
   const handleTeacherChange = (teacherId: string) => {
     if (studentId) {
       assignTeacher.mutate({
@@ -207,6 +208,35 @@ export function StudentDetailCard({ student }: StudentDetailCardProps) {
                           <p className="font-medium truncate">{h.pageTitle || h.url || '—'}</p>
                           <p className="text-xs text-muted-foreground truncate">{h.url}</p>
                           <p className="text-xs text-muted-foreground">{h.visitedAt ? new Date(h.visitedAt).toLocaleString() : ''}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            {/* Bookmarks (per-student) */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                <Bookmark className="h-4 w-4 text-violet-500" />
+                Bookmarks ({bookmarks?.length ?? 0})
+              </h4>
+              <div className="rounded-lg border bg-card p-3 max-h-48 overflow-y-auto">
+                {bookmarksLoading ? (
+                  <Skeleton className="h-20 w-full" />
+                ) : !bookmarks?.length ? (
+                  <p className="text-sm text-muted-foreground">No bookmarks saved</p>
+                ) : (
+                  <ul className="space-y-2 text-sm">
+                    {(bookmarks as any[]).map((b: any) => (
+                      <li key={b.id || b.url} className="flex items-start gap-2 border-b border-border/50 pb-2 last:border-0">
+                        <Bookmark className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{b.title || b.pageTitle || b.url || '—'}</p>
+                          <p className="text-xs text-muted-foreground truncate">{b.url}</p>
+                          <p className="text-xs text-muted-foreground font-light italic">
+                            {b.addedAt ? `Added: ${new Date(b.addedAt).toLocaleDateString()}` : ''}
+                          </p>
                         </div>
                       </li>
                     ))}

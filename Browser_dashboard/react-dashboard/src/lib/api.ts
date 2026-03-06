@@ -1,9 +1,9 @@
-import { 
-  ApiResponse, 
-  User, 
-  StatsOverview, 
-  AdminStats, 
-  WhitelistEntry, 
+import {
+  ApiResponse,
+  User,
+  StatsOverview,
+  AdminStats,
+  WhitelistEntry,
   BlacklistEntry,
   LoginActivity,
   Notification,
@@ -40,7 +40,7 @@ async function apiRequest<T>(
     // Handle non-JSON responses
     const contentType = response.headers.get('content-type');
     let data;
-    
+
     if (contentType && contentType.includes('application/json')) {
       try {
         data = await response.json();
@@ -110,11 +110,11 @@ async function apiRequest<T>(
 export async function verifyToken(): Promise<ApiResponse<{ valid: boolean; user: User }>> {
   const token = getStoredToken();
   const deviceId = getDeviceId();
-  
+
   if (!token || !deviceId) {
     return { success: false, error: 'Missing token or deviceId' };
   }
-  
+
   return apiRequest('/api/auth/verify-token', {
     method: 'POST',
     body: JSON.stringify({ token, deviceId }),
@@ -214,6 +214,14 @@ export async function getHistory(limit: number = 100): Promise<ApiResponse<any[]
 
 export async function getStudentHistory(studentId: string, limit: number = 100): Promise<ApiResponse<any[]>> {
   return apiRequest(`/api/students/${encodeURIComponent(studentId)}/history?limit=${limit}`);
+}
+
+export async function getBookmarks(): Promise<ApiResponse<any[]>> {
+  return apiRequest('/api/bookmarks');
+}
+
+export async function getStudentBookmarks(studentId: string): Promise<ApiResponse<any[]>> {
+  return apiRequest(`/api/students/${encodeURIComponent(studentId)}/bookmarks`);
 }
 
 export async function getWarningTriggers(limit: number = 100, studentId?: string): Promise<ApiResponse<any[]>> {
@@ -471,28 +479,28 @@ export async function getClassMetrics(): Promise<ApiResponse<ClassMetrics[]>> {
   // Transform students data to class metrics
   const studentsResponse = await getStudents();
   const activityResponse = await getActivity(undefined, 1000); // Get more activity for calculation
-  
+
   if (studentsResponse.success && studentsResponse.data) {
     const students = studentsResponse.data as any[];
     const activities = activityResponse.success && activityResponse.data ? activityResponse.data as any[] : [];
-    
+
     // Calculate average activity based on recent activity (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
+
     const recentActivities = activities.filter((a: any) => {
       const activityDate = new Date(a.visitStart || a.createdAt);
       return activityDate >= sevenDaysAgo;
     });
-    
+
     // Calculate activity percentage: (active students / total students) * 100
     const activeStudentIds = new Set(recentActivities.map((a: any) => a.studentId));
     const activeStudentsCount = activeStudentIds.size;
     const totalStudents = students.length;
-    const averageActivity = totalStudents > 0 
+    const averageActivity = totalStudents > 0
       ? Math.round((activeStudentsCount / totalStudents) * 100)
       : 0;
-    
+
     // Group by mode or create default class
     const metrics: ClassMetrics[] = [
       {
