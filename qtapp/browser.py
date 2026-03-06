@@ -238,12 +238,13 @@ class HistoryDialog(QDialog):
 
 
 class BookmarksDialog(QDialog):
-    """Shows and manages the current user's personal bookmarks (local storage)."""
-    def __init__(self, parent=None, user_id=None):
+    """Shows and manages the current user's personal bookmarks (database backed)."""
+    def __init__(self, parent=None, user_id=None, auth=None):
         super().__init__(parent)
         self.setWindowTitle("Bookmarks")
         self.resize(650, 400)
         self.user_id = user_id
+        self.auth = auth
         self.main_window = parent
         layout = QVBoxLayout(self)
         self.list_widget = QListWidget()
@@ -270,7 +271,7 @@ class BookmarksDialog(QDialog):
         self.list_widget.clear()
         if not self.user_id or load_bookmarks is None:
             return
-        for b in load_bookmarks(self.user_id):
+        for b in load_bookmarks(self.user_id, auth_instance=self.auth):
             title = (b.get("title") or b.get("url") or "").strip() or "(No title)"
             url = (b.get("url") or "").strip()
             self.list_widget.addItem(f"{title}  —  {url}")
@@ -290,7 +291,7 @@ class BookmarksDialog(QDialog):
         if not item or not self.user_id or remove_bookmark is None:
             return
         url = item.data(Qt.ItemDataRole.UserRole)
-        if url and remove_bookmark(self.user_id, url):
+        if url and remove_bookmark(self.user_id, url, auth_instance=self.auth):
             self._load_bookmarks()
 
 
@@ -780,7 +781,7 @@ class MainWindow(QMainWindow):
 
     def show_bookmarks_dialog(self):
         """Open dialog with current user's personal bookmarks."""
-        dlg = BookmarksDialog(self, user_id=self.user_id)
+        dlg = BookmarksDialog(self, user_id=self.user_id, auth=self.auth)
         dlg.exec()
 
     def add_current_bookmark(self):
@@ -792,7 +793,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Bookmarks", "No page to bookmark.")
             return
         title = self.current_view().title() or url
-        if add_bookmark(self.user_id, url, title):
+        if add_bookmark(self.user_id, url, title, auth_instance=self.auth):
             QMessageBox.information(self, "Bookmarks", f"Bookmarked: {title[:50]}...")
         else:
             QMessageBox.warning(self, "Bookmarks", "Could not save bookmark.")

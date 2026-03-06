@@ -813,6 +813,94 @@ class Authentication:
             # Table might not exist yet
             print(f"Error adding browsing history: {e}")
 
+    # --- Bookmark methods (Database backed) ---
+
+    def add_bookmark_to_db(self, user_id, url, title=None):
+        """Add a bookmark to the database for a specific user."""
+        try:
+            if not url or not url.strip():
+                return False
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            # Update if exists, else insert
+            cursor.execute("SELECT id FROM Bookmarks WHERE user_id = %s AND url = %s", (user_id, url))
+            existing = cursor.fetchone()
+            if existing:
+                cursor.execute("""
+                    UPDATE Bookmarks SET title = %s, added_at = %s 
+                    WHERE id = %s
+                """, (title or url, datetime.now(), existing[0]))
+            else:
+                cursor.execute("""
+                    INSERT INTO Bookmarks (user_id, url, title, added_at)
+                    VALUES (%s, %s, %s, %s)
+                """, (user_id, url[:2048], (title or url)[:512], datetime.now()))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error adding bookmark to DB: {e}")
+            return False
+
+    def get_bookmarks_from_db(self, user_id):
+        """Fetch all bookmarks for a specific user from the database."""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT url, title, added_at FROM Bookmarks 
+                WHERE user_id = %s ORDER BY added_at DESC
+            """, (user_id,))
+            rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return [{"url": r[0], "title": r[1], "added_at": r[2].isoformat() if r[2] else ""} for r in rows]
+        except Exception as e:
+            print(f"Error fetching bookmarks from DB: {e}")
+            return []
+
+    def remove_bookmark_from_db(self, user_id, url):
+        """Remove a bookmark by URL for a specific user."""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM Bookmarks WHERE user_id = %s AND url = %s", (user_id, url))
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return deleted
+        except Exception as e:
+            print(f"Error removing bookmark from DB: {e}")
+            return False
+
+    def get_student_bookmarks_from_api(self, student_id_or_user_id, username, role):
+        """Fetch a specific student's bookmarks (for teachers/admins monitoring)."""
+        try:
+            base_url = (os.getenv("API_BASE_URL") or "").rstrip("/")
+            if not base_url:
+                return []
+            token = self.generate_token(username, role, 0) # user_id 0 as placeholder, PHP uses token for auth anyway
+            if isinstance(token, bytes):
+                token = token.decode("utf-8")
+            import urllib.request
+            req = urllib.request.Request(
+                f"{base_url}/api/students/{student_id_or_user_id}/bookmarks",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                import json
+                data = json.loads(resp.read().decode())
+            if isinstance(data, dict) and data.get("success") and isinstance(data.get("data"), list):
+                return data["data"]
+            return []
+        except Exception as e:
+            print(f"Error fetching student bookmarks from API: {e}")
+            return []
+
+    # --- End Bookmark methods ---
+
     def get_browsing_history(self, user_id, username=None, role=None, limit=200):
         """Fetch current user's browsing history from API (personal only). Returns list of {url, pageTitle, visitedAt}."""
         try:
