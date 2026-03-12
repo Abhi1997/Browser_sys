@@ -1,7 +1,7 @@
 import os
 import sys
 from PyQt6.QtCore import Qt, QCoreApplication
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMessageBox, QMainWindow
 from PyQt6.QtCore import QSettings
 from browser import MainWindow, apply_app_theme
 from gmail_oauth import GmailLoginWindow
@@ -9,18 +9,29 @@ from gmail_oauth import GmailLoginWindow
 def main():
     try:
         print("Starting main application...")
-        # macOS stability flags
-        os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
-        os.environ["QT_OPENGL"] = "software"
-        os.environ["QT_QUICK_BACKEND"] = "software"
-        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
-            "--disable-gpu --disable-software-rasterizer --no-sandbox "
-            "--disable-features=UseOzonePlatform,VizDisplayCompositor "
-            "--js-flags=--max-old-space-size=128 --lite-mode"
-        )
+        import platform
+        if platform.system() != "Darwin":
+            # Add stability flags for other OS if needed, but remove from macOS which crashes
+            os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
+            os.environ["QT_OPENGL"] = "software"
+            os.environ["QT_QUICK_BACKEND"] = "software"
+            os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+                "--disable-gpu --disable-software-rasterizer --no-sandbox "
+                "--disable-features=UseOzonePlatform,VizDisplayCompositor "
+                "--js-flags=--max-old-space-size=128 --lite-mode"
+            )
 
         print("Initializing QApplication...")
         app = QApplication(sys.argv)
+        
+        # macOS fix: Create a background dummy window that prevents Qt WebEngine 
+        # from terminating when switching from login window to main window
+        print("Initializing background window...")
+        dummy_window = QMainWindow()
+        dummy_window.setWindowOpacity(0.0)
+        dummy_window.resize(1, 1)
+        dummy_window.move(-10000, -10000)
+        dummy_window.show()
         
         # Set exception hook to catch uncaught exceptions
         def exception_hook(exctype, value, traceback):
@@ -57,9 +68,12 @@ def main():
                 user_id=getattr(login_window, "user_id", None),
                 gmail=getattr(login_window, "gmail", None),
             )
+            # WebEngine is safe to continue since MainWindow is created
+            dummy_window.close()
             window.show()
             sys.exit(app.exec())
         else:
+            dummy_window.close()
             sys.exit()
     except Exception as e:
         print(f"Fatal error during startup: {e}")

@@ -15,7 +15,8 @@ from PyQt6.QtWidgets import (
     QMessageBox, QDialog, QStyle, QHBoxLayout, QLabel, QProgressBar,
     QTableWidget, QTableWidgetItem, QHeaderView, QFormLayout, QGroupBox,
     QMenu, QListWidget, QListWidgetItem, QDialogButtonBox, QCheckBox,
-    QAbstractItemView, QGridLayout,
+    QAbstractItemView, QGridLayout, QInputDialog, QFileDialog, QSplitter,
+    QTreeWidget, QTreeWidgetItem,
 )
 from PyQt6.QtGui import QAction, QIcon, QColor, QPalette
 from PyQt6.QtCore import QSettings, Qt
@@ -80,6 +81,34 @@ class OfflineOnlyInterceptor(QWebEngineUrlRequestInterceptor):
             info.block(True)
 
 
+class SecureWebEnginePage(QWebEnginePage):
+    """Custom page for intercepting navigation requests based on mode limitations."""
+    def __init__(self, profile, parent=None, mode_enforcer=None, student_id=None, current_mode=None):
+        super().__init__(profile, parent)
+        self.mode_enforcer = mode_enforcer
+        self.student_id = student_id
+        self.current_mode = current_mode
+
+    def acceptNavigationRequest(self, url, _type, isMainFrame):
+        url_str = url.toString()
+        # Only block main frame navigations for restricted students
+        if isMainFrame and self.current_mode and self.mode_enforcer:
+            # By default allow internal URIs
+            if url_str.startswith("about:") or url_str.startswith("data:"):
+                return True
+            
+            # Check restricted URLs explicitly via ModeEnforcement
+            is_allowed, reason = self.mode_enforcer.is_url_allowed(url_str, self.current_mode, self.student_id)
+            if not is_allowed:
+                parent_tab = self.parent()
+                if parent_tab:
+                    main_window = parent_tab.window()
+                    if hasattr(main_window, "show_bypass_warning"):
+                        main_window.show_bypass_warning(url_str, reason)
+                return False
+        return super().acceptNavigationRequest(url, _type, isMainFrame)
+
+
 class BrowserTab(QWidget):
     def __init__(self, parent=None, mode_enforcer=None, student_id=None, current_mode=None):
         super().__init__(parent)
@@ -93,7 +122,14 @@ class BrowserTab(QWidget):
             self.profile.setUrlRequestInterceptor(OfflineOnlyInterceptor(self))
         else:
             self.profile = QWebEngineProfile.defaultProfile()
-        self.page = QWebEnginePage(self.profile)
+            
+        self.page = SecureWebEnginePage(
+            self.profile, 
+            parent=self, 
+            mode_enforcer=self.mode_enforcer, 
+            student_id=self.student_id, 
+            current_mode=self.current_mode
+        )
         self.view = QWebEngineView()
         self.view.setPage(self.page)
 
@@ -708,6 +744,40 @@ class MainWindow(QMainWindow):
         self.dark_mode_act.setChecked(self._is_dark_mode())
         self.dark_mode_act.triggered.connect(self._toggle_dark_mode)
         settings_menu.addAction(self.dark_mode_act)
+        
+        self.set_homepage_act = QAction("Set Homepage", self)
+        self.set_homepage_act.triggered.connect(self._set_homepage)
+        settings_menu.addAction(self.set_homepage_act)
+
+    def _set_homepage(self):
+        """Prompt user for a custom homepage URL and save it locally."""
+        default_hp = "https://www.google.com"
+        import json
+        import os
+        settings_file = os.path.join(os.path.dirname(__file__), "local_settings.json")
+        if os.path.exists(settings_file):
+            try:
+                with open(settings_file, "r") as f:
+                    data = json.load(f)
+                    default_hp = data.get("homepage", default_hp)
+            except Exception:
+                pass
+
+        url, ok = QInputDialog.getText(
+            self, "Set Homepage", "Enter your preferred homepage URL:",
+            QLineEdit.EchoMode.Normal, default_hp
+        )
+        if ok and url:
+            if not url.startswith("http://") and not url.startswith("https://"):
+                url = "https://" + url
+            # Build basic JSON state
+            data = {"homepage": url}
+            try:
+                with open(settings_file, "w") as f:
+                    json.dump(data, f)
+                QMessageBox.information(self, "Success", f"Homepage set to:\n{url}")
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Failed to save homepage locally:\n{e}")
 
     def current_tab(self) -> BrowserTab:
         return self.tabs.currentWidget()
@@ -834,7 +904,18 @@ class MainWindow(QMainWindow):
                         return
             self.current_view().setUrl(QUrl("about:blank"))
         else:
-            self.current_view().setUrl(QUrl("https://www.google.com"))
+            default_hp = "https://www.google.com"
+            import json
+            import os
+            settings_file = os.path.join(os.path.dirname(__file__), "local_settings.json")
+            if os.path.exists(settings_file):
+                try:
+                    with open(settings_file, "r") as f:
+                        data = json.load(f)
+                        default_hp = data.get("homepage", default_hp)
+                except Exception:
+                    pass
+            self.current_view().setUrl(QUrl(default_hp))
 
     def cache_current_page(self):
         """Save current page to offline cache (teachers/admins only)."""

@@ -10,7 +10,7 @@ import os
 from PyQt6.QtCore import QUrl
 from PyQt6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QApplication, QStyle, QMessageBox,
-    QPlainTextEdit, QDialogButtonBox,
+    QPlainTextEdit, QDialogButtonBox, QTabWidget,
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage
@@ -122,8 +122,16 @@ class DashboardWindow(QDialog):
         button_layout.addStretch()
         layout.addWidget(button_container)
         
-        # Create web view (use custom page only for console capture; keep reference so page is not GC'd)
-        self.view = QWebEngineView(self)
+        # Create tabs
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+        
+        # Original Dashboard Tab
+        dashboard_tab = QWidget()
+        dash_layout = QVBoxLayout(dashboard_tab)
+        dash_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.view = QWebEngineView(dashboard_tab)
         try:
             from PyQt6.QtWebEngineCore import QWebEngineProfile
             profile = QWebEngineProfile.defaultProfile()
@@ -132,7 +140,9 @@ class DashboardWindow(QDialog):
         except Exception as e:
             print(f"Could not attach console-capture page: {e}")
             self._dashboard_page = None
-        layout.addWidget(self.view)
+            
+        dash_layout.addWidget(self.view)
+        self.tabs.addTab(dashboard_tab, "Live Dashboard")
         
         # Load dashboard URL with authentication
         dashboard_url = self._build_dashboard_url()
@@ -146,9 +156,164 @@ class DashboardWindow(QDialog):
             )
             self.reject()
             return
+
+        # Local Analytics Tab
+        analytics_tab = QWidget()
+        analytics_layout = QVBoxLayout(analytics_tab)
+        analytics_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.analytics_view = QWebEngineView(analytics_tab)
+        analytics_layout.addWidget(self.analytics_view)
+        
+        # Add refresh button for analytics tab
+        refresh_btn_container = QWidget()
+        refresh_btn_layout = QHBoxLayout(refresh_btn_container)
+        refresh_btn_layout.setContentsMargins(10, 5, 10, 5)
+        refresh_btn = QPushButton("Refresh Data")
+        refresh_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f3f4f6;
+                color: #374151;
+                border: 1px solid #d1d5db;
+                padding: 5px 15px;
+                border-radius: 4px;
+                font-size: 13px;
+            }
+            QPushButton:hover { background-color: #e5e7eb; }
+        """)
+        refresh_btn.clicked.connect(self._load_analytics)
+        refresh_btn_layout.addStretch()
+        refresh_btn_layout.addWidget(refresh_btn)
+        analytics_layout.addWidget(refresh_btn_container)
+        
+        self.tabs.addTab(analytics_tab, "Local Analytics")
+        self._load_analytics()
         
         # Set window icon
         self.setWindowIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
+
+    def _load_analytics(self):
+        """Load data from database and render charts using Chart.js"""
+        # Fetch from database
+        try:
+            conn = self.auth._get_conn()
+            cursor = conn.cursor()
+            
+            # Fetch violations grouped by type
+            cursor.execute("SELECT violation_type, COUNT(*) as count FROM Violations GROUP BY violation_type")
+            type_violations = cursor.fetchall() or []
+            
+            # Fetch violations grouped by mode
+            cursor.execute("SELECT current_mode, COUNT(*) as count FROM Violations GROUP BY current_mode")
+            mode_violations = cursor.fetchall() or []
+            
+            # Fetch top 10 blocked domains
+            cursor.execute("SELECT attempted_url, COUNT(*) as count FROM Violations GROUP BY attempted_url ORDER BY count DESC LIMIT 10")
+            top_urls = cursor.fetchall() or []
+            
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Error fetching analytics data: {e}")
+            type_violations = []
+            mode_violations = []
+            top_urls = []
+            
+        import json
+        
+        types_labels = json.dumps([v[0] for v in type_violations])
+        types_data = json.dumps([v[1] for v in type_violations])
+        
+        modes_labels = json.dumps([v[0] for v in mode_violations])
+        modes_data = json.dumps([v[1] for v in mode_violations])
+        
+        urls_labels = json.dumps([v[0] for v in top_urls])
+        urls_data = json.dumps([v[1] for v in top_urls])
+        
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Analytics</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f3f4f6; color: #1f2937; padding: 20px; }}
+                .dashboard {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }}
+                .chart-container {{ background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 300px; }}
+                .full-width {{ grid-column: 1 / -1; height: 350px; }}
+                h2 {{ margin-top: 0; font-size: 16px; color: #4b5563; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; }}
+                canvas {{ width: 100% !important; height: calc(100% - 30px) !important; }}
+            </style>
+        </head>
+        <body>
+            <h1>Security Analytics Dashboard</h1>
+            <div class="dashboard">
+                <div class="chart-container">
+                    <h2>Violations by Mode</h2>
+                    <canvas id="modeChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h2>Violations by Type</h2>
+                    <canvas id="typeChart"></canvas>
+                </div>
+                <div class="chart-container full-width">
+                    <h2>Top Blocked URLs</h2>
+                    <canvas id="urlChart"></canvas>
+                </div>
+            </div>
+            
+            <script>
+                const commonOptions = {{ responsive: true, maintainAspectRatio: false }};
+                
+                // Mode Chart
+                new Chart(document.getElementById('modeChart'), {{
+                    type: 'pie',
+                    data: {{
+                        labels: {modes_labels},
+                        datasets: [{{
+                            data: {modes_data},
+                            backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#6366f1']
+                        }}]
+                    }},
+                    options: {{ ...commonOptions, plugins: {{ legend: {{ position: 'right' }} }} }}
+                }});
+                
+                // Type Chart
+                new Chart(document.getElementById('typeChart'), {{
+                    type: 'doughnut',
+                    data: {{
+                        labels: {types_labels},
+                        datasets: [{{
+                            data: {types_data},
+                            backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#6366f1']
+                        }}]
+                    }},
+                    options: {{ ...commonOptions, plugins: {{ legend: {{ position: 'right' }} }} }}
+                }});
+                
+                // URL Chart
+                new Chart(document.getElementById('urlChart'), {{
+                    type: 'bar',
+                    data: {{
+                        labels: {urls_labels},
+                        datasets: [{{
+                            label: 'Violation Count',
+                            data: {urls_data},
+                            backgroundColor: '#3b82f6'
+                        }}]
+                    }},
+                    options: {{
+                        ...commonOptions,
+                        scales: {{
+                            y: {{ beginAtZero: true, ticks: {{ precision: 0 }} }}
+                        }}
+                    }}
+                }});
+            </script>
+        </body>
+        </html>
+        """
+        self.analytics_view.setHtml(html)
 
     def showEvent(self, event):
         """Log dashboard open by user (for admin dashboard logs)."""
