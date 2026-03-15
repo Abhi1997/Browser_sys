@@ -129,19 +129,24 @@ class ModeEnforcement:
             # Filter by admin_id if student has one, otherwise global whitelist
             if admin_id:
                 cursor.execute("""
-                    SELECT id FROM WhitelistDomains 
-                    WHERE domain=%s AND mode=%s AND is_active=1 AND admin_id=%s
-                """, (domain, mode, admin_id))
+                    SELECT domain FROM WhitelistDomains 
+                    WHERE mode=%s AND is_active=1 AND admin_id=%s
+                """, (mode, admin_id))
             else:
                 cursor.execute("""
-                    SELECT id FROM WhitelistDomains 
-                    WHERE domain=%s AND mode=%s AND is_active=1
-                """, (domain, mode))
+                    SELECT domain FROM WhitelistDomains 
+                    WHERE mode=%s AND is_active=1
+                """, (mode,))
             
-            result = cursor.fetchone()
+            rules = [row[0].lower() for row in cursor.fetchall() if row and row[0]]
             cursor.close()
             conn.close()
-            return result is not None
+            
+            domain_lower = domain.lower()
+            for rule in rules:
+                if domain_lower == rule or domain_lower.endswith('.' + rule):
+                    return True
+            return False
         except Exception as e:
             print(f"Error checking whitelist: {e}")
             return False
@@ -201,19 +206,24 @@ class ModeEnforcement:
             # Filter by admin_id if student has one, otherwise global blacklist
             if admin_id:
                 cursor.execute("""
-                    SELECT id FROM BlacklistDomains 
-                    WHERE domain=%s AND mode=%s AND is_active=1 AND admin_id=%s
-                """, (domain, mode, admin_id))
+                    SELECT domain FROM BlacklistDomains 
+                    WHERE mode=%s AND is_active=1 AND admin_id=%s
+                """, (mode, admin_id))
             else:
                 cursor.execute("""
-                    SELECT id FROM BlacklistDomains 
-                    WHERE domain=%s AND mode=%s AND is_active=1
-                """, (domain, mode))
+                    SELECT domain FROM BlacklistDomains 
+                    WHERE mode=%s AND is_active=1
+                """, (mode,))
             
-            result = cursor.fetchone()
+            rules = [row[0].lower() for row in cursor.fetchall() if row and row[0]]
             cursor.close()
             conn.close()
-            return result is not None
+
+            domain_lower = domain.lower()
+            for rule in rules:
+                if domain_lower == rule or domain_lower.endswith('.' + rule):
+                    return True
+            return False
         except Exception as e:
             print(f"Error checking blacklist: {e}")
             return False

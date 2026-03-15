@@ -59,6 +59,7 @@ qtapp/venv/
 *.sqlite
 *.db
 config.local.php
+local_settings.json
 # .env.example
 
 # OS
