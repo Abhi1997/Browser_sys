@@ -878,18 +878,22 @@ class Authentication:
     def get_student_bookmarks_from_api(self, student_id_or_user_id, username, role):
         """Fetch a specific student's bookmarks (for teachers/admins monitoring)."""
         try:
-            base_url = (os.getenv("API_BASE_URL") or "").rstrip("/")
+            base_url = (os.getenv("API_BASE_URL") or os.getenv("VITE_API_URL") or "").rstrip("/")
             if not base_url:
                 return []
             token = self.generate_token(username, role, 0) # user_id 0 as placeholder, PHP uses token for auth anyway
             if isinstance(token, bytes):
                 token = token.decode("utf-8")
             import urllib.request
+            import ssl
             req = urllib.request.Request(
                 f"{base_url}/api/students/{student_id_or_user_id}/bookmarks",
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
                 import json
                 data = json.loads(resp.read().decode())
             if isinstance(data, dict) and data.get("success") and isinstance(data.get("data"), list):
@@ -918,18 +922,22 @@ class Authentication:
                         role = role or row[1]
                 except Exception:
                     pass
-            base_url = (os.getenv("API_BASE_URL") or "").rstrip("/")
+            base_url = (os.getenv("API_BASE_URL") or os.getenv("VITE_API_URL") or "").rstrip("/")
             if not base_url:
                 return []
             token = self.generate_token(username or "", role or "student", user_id)
             if isinstance(token, bytes):
                 token = token.decode("utf-8")
             import urllib.request
+            import ssl
             req = urllib.request.Request(
                 f"{base_url}/api/history?limit={min(max(limit, 1), 500)}",
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
                 import json
                 data = json.loads(resp.read().decode())
             if isinstance(data, dict) and data.get("success") and isinstance(data.get("data"), list):

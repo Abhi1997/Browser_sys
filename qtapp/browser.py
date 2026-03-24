@@ -146,26 +146,18 @@ class BrowserTab(QWidget):
     def on_url_changed(self, qurl: QUrl):
         # Notify the main window to update the URL bar
         mw = self.window()
-        try:
-            from browser import MainWindow
-            if isinstance(mw, MainWindow):
-                mw.url_bar.setText(qurl.toString())
-        except Exception:
-            pass
+        if hasattr(mw, 'url_bar'):
+            mw.url_bar.setText(qurl.toString())
 
     def on_title_changed(self, title: str):
         # Update the tab text
         parent_widget = self.parentWidget()
         if parent_widget:
             qtab = parent_widget.parentWidget()
-            try:
-                from PyQt6.QtWidgets import QTabWidget
-                if isinstance(qtab, QTabWidget):
-                    idx = qtab.indexOf(self)
-                    if idx >= 0:
-                        qtab.setTabText(idx, title[:20] + "..." if len(title) > 20 else title)
-            except Exception:
-                pass
+            if hasattr(qtab, 'indexOf') and hasattr(qtab, 'setTabText'):
+                idx = qtab.indexOf(self)
+                if idx >= 0:
+                    qtab.setTabText(idx, title[:20] + "..." if len(title) > 20 else title)
 
     def on_load_started(self):
         """Track when page load starts"""
@@ -174,12 +166,7 @@ class BrowserTab(QWidget):
     def on_load_finished(self, ok: bool):
         # Update status bar via Main Window
         mw = self.window()
-        try:
-            from browser import MainWindow
-        except Exception:
-            MainWindow = None
-            
-        if MainWindow and isinstance(mw, MainWindow):
+        if hasattr(mw, 'status') and hasattr(mw, 'user_id'):
             if ok:
                 mw.status.showMessage(f"Loaded: {self.view.title()}")
                 url = self.view.url().toString()
@@ -410,12 +397,13 @@ class LoadingScreen(QWidget):
     """Loading screen shown after login; shows user mode at launch"""
     def __init__(self, parent=None, mode_name=None, user_role=None):
         super().__init__(parent)
+        from PyQt6.QtCore import Qt, QTimer
         self.setStyleSheet("background-color: #ffffff;")
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.label = QLabel("Loading Secure Browser...")
-        self.label.setStyleSheet("font-size: 18px; font-weight: bold; color: #1f2937; background-color: transparent;")
+        self.label.setStyleSheet("font-size: 26px; font-weight: bold; color: #000000; background-color: transparent; margin-bottom: 15px;")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.label)
 
@@ -423,33 +411,50 @@ class LoadingScreen(QWidget):
         if user_role == "student" and mode_name:
             mode_label = QLabel(f"Mode: {mode_name}")
             mode_label.setStyleSheet(
-                "font-size: 14px; color: #4b5563; background-color: #f3f4f6; padding: 8px 16px; "
-                "border-radius: 8px; margin-top: 8px;"
+                "font-size: 16px; font-weight: bold; color: #111827; background-color: #e5e7eb; padding: 10px 20px; "
+                "border-radius: 8px; margin-bottom: 20px;"
             )
             mode_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(mode_label)
         elif user_role:
             role_label = QLabel(f"Role: {user_role.capitalize()}")
-            role_label.setStyleSheet("font-size: 12px; color: #6b7280; margin-top: 4px;")
+            role_label.setStyleSheet("font-size: 15px; font-weight: bold; color: #374151; margin-bottom: 20px;")
             role_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(role_label)
         
         self.progress = QProgressBar()
-        self.progress.setRange(0, 0)  # Indeterminate
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self.progress.setTextVisible(True)
+        self.progress.setFormat("%p%")
         self.progress.setStyleSheet("""
             QProgressBar {
-                border: 2px solid #e5e7eb;
-                border-radius: 5px;
+                border: 2px solid #d1d5db;
+                border-radius: 8px;
                 text-align: center;
-                height: 20px;
+                height: 28px;
                 background-color: #f3f4f6;
+                font-size: 14px;
+                font-weight: bold;
+                color: #000000;
             }
             QProgressBar::chunk {
                 background-color: #3b82f6;
-                border-radius: 3px;
+                border-radius: 6px;
             }
         """)
         layout.addWidget(self.progress)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_progress)
+        self.timer.start(15)  # 100 steps * 15ms = 1500ms
+
+    def update_progress(self):
+        val = self.progress.value()
+        if val < 100:
+            self.progress.setValue(val + 1)
+        else:
+            self.timer.stop()
 
 
 class MainWindow(QMainWindow):
@@ -563,6 +568,7 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar("Navigation")
         toolbar.setIconSize(QSize(20, 20))
         self.addToolBar(toolbar)
+        self.main_toolbar = toolbar
 
         style = QApplication.style()
 
@@ -623,33 +629,32 @@ class MainWindow(QMainWindow):
         if self.user_role != "student" or not self.current_mode:
             return
         
-        mode_toolbar = QToolBar("Mode Indicator")
-        mode_toolbar.setMovable(False)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, mode_toolbar)
-        
         mode_info = self.mode_enforcer.get_mode_info(self.current_mode)
         
+        # Add a tiny separator or spacer for visual breathing room before mode
+        self.main_toolbar.addSeparator()
+
         # Mode label
         mode_label = QLabel(f"{mode_info['icon']} {mode_info['name']}")
         mode_label.setStyleSheet(f"""
             QLabel {{
                 background-color: {mode_info['color']};
                 color: white;
-                padding: 8px 15px;
-                border-radius: 5px;
+                padding: 4px 10px;
+                border-radius: 4px;
                 font-weight: bold;
-                font-size: 12px;
+                font-size: 11px;
+                margin-left: 5px;
+                margin-right: 5px;
             }}
         """)
         mode_label.setToolTip(mode_info['description'])
-        mode_toolbar.addWidget(mode_label)
-        
-        mode_toolbar.addSeparator()
+        self.main_toolbar.addWidget(mode_label)
         
         # Info label
-        info_label = QLabel("Mode cannot be changed by student")
-        info_label.setStyleSheet("color: #374151; font-size: 11px; padding: 5px; background-color: transparent;")
-        mode_toolbar.addWidget(info_label)
+        info_label = QLabel("Mode locked by Teacher")
+        info_label.setStyleSheet("color: #6b7280; font-size: 10px; padding-right: 10px; background-color: transparent;")
+        self.main_toolbar.addWidget(info_label)
 
     def setup_menu(self):
         menubar = self.menuBar()
