@@ -145,23 +145,27 @@ class BrowserTab(QWidget):
 
     def on_url_changed(self, qurl: QUrl):
         # Notify the main window to update the URL bar
-        parent = self.parent()
-        if isinstance(parent, QTabWidget):
-            mw = parent.parent()
-            try:
-                from browser import MainWindow  # local import to avoid forward reference
-            except Exception:
-                MainWindow = None
-            if MainWindow and isinstance(mw, MainWindow):
+        mw = self.window()
+        try:
+            from browser import MainWindow
+            if isinstance(mw, MainWindow):
                 mw.url_bar.setText(qurl.toString())
+        except Exception:
+            pass
 
     def on_title_changed(self, title: str):
         # Update the tab text
-        parent = self.parent()
-        if isinstance(parent, QTabWidget):
-            idx = parent.indexOf(self)
-            if idx >= 0:
-                parent.setTabText(idx, title[:20] + "..." if len(title) > 20 else title)
+        parent_widget = self.parentWidget()
+        if parent_widget:
+            qtab = parent_widget.parentWidget()
+            try:
+                from PyQt6.QtWidgets import QTabWidget
+                if isinstance(qtab, QTabWidget):
+                    idx = qtab.indexOf(self)
+                    if idx >= 0:
+                        qtab.setTabText(idx, title[:20] + "..." if len(title) > 20 else title)
+            except Exception:
+                pass
 
     def on_load_started(self):
         """Track when page load starts"""
@@ -169,36 +173,35 @@ class BrowserTab(QWidget):
 
     def on_load_finished(self, ok: bool):
         # Update status bar via Main Window
-        parent = self.parent()
-        if isinstance(parent, QTabWidget):
-            mw = parent.parent()
-            try:
-                from browser import MainWindow
-            except Exception:
-                MainWindow = None
-            if MainWindow and isinstance(mw, MainWindow):
-                if ok:
-                    mw.status.showMessage(f"Loaded: {self.view.title()}")
-                    url = self.view.url().toString()
-                    title = self.view.title() or ""
-                    # Save browsing history for all logged-in users (for own history + teacher view)
-                    if mw.user_id and getattr(mw, 'auth', None):
-                        try:
-                            di = mw.auth.get_device_info()
-                            dev_id = di.get("device_id") if di else None
-                            mw.auth.add_browsing_history(mw.user_id, url, page_title=title, device_id=dev_id)
-                        except Exception:
-                            pass
-                    # Log activity if student (ActivityLogs for mode/audit)
-                    if self.student_id and self.visit_start:
-                        duration = (datetime.now() - self.visit_start).seconds
-                        if mw.current_mode and mw.user_id:
-                            self.mode_enforcer.log_activity(
-                                self.student_id, mw.user_id, url,
-                                mw.current_mode, duration
-                            )
-                else:
-                    mw.status.showMessage("Failed to load page")
+        mw = self.window()
+        try:
+            from browser import MainWindow
+        except Exception:
+            MainWindow = None
+            
+        if MainWindow and isinstance(mw, MainWindow):
+            if ok:
+                mw.status.showMessage(f"Loaded: {self.view.title()}")
+                url = self.view.url().toString()
+                title = self.view.title() or ""
+                # Save browsing history for all logged-in users (for own history + teacher view)
+                if mw.user_id and getattr(mw, 'auth', None):
+                    try:
+                        di = mw.auth.get_device_info()
+                        dev_id = di.get("device_id") if di else None
+                        mw.auth.add_browsing_history(mw.user_id, url, page_title=title, device_id=dev_id)
+                    except Exception as e:
+                        print(f"Failed to save browsing history in GUI: {e}")
+                # Log activity if student (ActivityLogs for mode/audit)
+                if self.student_id and self.visit_start:
+                    duration = (datetime.now() - self.visit_start).seconds
+                    if mw.current_mode and mw.user_id:
+                        self.mode_enforcer.log_activity(
+                            self.student_id, mw.user_id, url,
+                            mw.current_mode, duration
+                        )
+            else:
+                mw.status.showMessage("Failed to load page")
 
 
 

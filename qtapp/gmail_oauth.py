@@ -392,11 +392,31 @@ class GmailLoginWindow(QDialog):
         # Username/password fields (fallback)
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Username")
+        self.username_input.setStyleSheet("""
+        QLineEdit {
+            color: black;  /* text color when typing */
+            background-color: lightgrey;
+        }
+
+        QLineEdit::placeholder {
+            color: black;  /* placeholder text color */
+        }
+        """)
         self.username_input.returnPressed.connect(self.handle_password_login)  # Enter key triggers login
         layout.addWidget(self.username_input)
         
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Password")
+        self.password_input.setStyleSheet("""
+        QLineEdit {
+            color: black;  /* text color when typing */
+            background-color: lightgrey;
+        }
+
+        QLineEdit::placeholder {
+            color: black;  /* placeholder text color */
+        }
+        """)
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_input.returnPressed.connect(self.handle_password_login)  # Enter key triggers login
         layout.addWidget(self.password_input)
