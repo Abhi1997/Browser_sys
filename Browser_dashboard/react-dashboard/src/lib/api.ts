@@ -169,8 +169,9 @@ export async function resetPassword(token: string, newPassword: string): Promise
 }
 
 // Stats endpoints
-export async function getStatsOverview(): Promise<ApiResponse<StatsOverview>> {
-  const response = await apiRequest('/api/stats');
+export async function getStatsOverview(adminId?: string): Promise<ApiResponse<StatsOverview>> {
+  const query = adminId ? `?admin_id=${encodeURIComponent(adminId)}` : '';
+  const response = await apiRequest(`/api/stats${query}`);
   if (response.success && response.data) {
     const data = response.data as any;
     return {
@@ -264,7 +265,8 @@ export async function getAllAdminStats(): Promise<ApiResponse<AdminStats[]>> {
 
 // User endpoints
 export async function getUsers(adminId?: string): Promise<ApiResponse<User[]>> {
-  const response = await apiRequest('/api/users');
+  const query = adminId ? `?admin_id=${encodeURIComponent(adminId)}` : '';
+  const response = await apiRequest(`/api/users${query}`);
   if (response.success && response.data) {
     // Transform API response to match User interface
     const users = (response.data as any[]).map((u: any) => ({
@@ -309,7 +311,8 @@ export async function toggleUserStatus(id: string): Promise<ApiResponse<User>> {
 
 // Whitelist endpoints
 export async function getWhitelist(adminId?: string): Promise<ApiResponse<WhitelistEntry[]>> {
-  return apiRequest('/api/whitelist');
+  const query = adminId ? `?admin_id=${encodeURIComponent(adminId)}` : '';
+  return apiRequest(`/api/whitelist${query}`);
 }
 
 export async function addToWhitelist(entry: Partial<WhitelistEntry>): Promise<ApiResponse<WhitelistEntry>> {
@@ -334,7 +337,8 @@ export async function removeFromWhitelist(id: string): Promise<ApiResponse<void>
 
 // Blacklist endpoints
 export async function getBlacklist(adminId?: string): Promise<ApiResponse<BlacklistEntry[]>> {
-  return apiRequest('/api/blacklist');
+  const query = adminId ? `?admin_id=${encodeURIComponent(adminId)}` : '';
+  return apiRequest(`/api/blacklist${query}`);
 }
 
 export async function addToBlacklist(entry: Partial<BlacklistEntry>): Promise<ApiResponse<BlacklistEntry>> {
@@ -422,8 +426,9 @@ export async function markNotificationRead(id: string): Promise<ApiResponse<void
 }
 
 // Student endpoints
-export async function getStudents(): Promise<ApiResponse<any[]>> {
-  return apiRequest('/api/students');
+export async function getStudents(adminId?: string): Promise<ApiResponse<any[]>> {
+  const query = adminId ? `?admin_id=${encodeURIComponent(adminId)}` : '';
+  return apiRequest(`/api/students${query}`);
 }
 
 export async function setStudentMode(studentId: string, mode: string, changedBy: number): Promise<ApiResponse<any>> {

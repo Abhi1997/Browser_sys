@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   getStatsOverview,
   getUsers,
@@ -36,10 +37,13 @@ import { toast } from '@/hooks/use-toast';
 
 // Stats query
 export function useStats() {
+  const { selectedAdminId } = useAuth();
+  const adminId = selectedAdminId !== 'system' ? selectedAdminId : undefined;
+
   return useQuery({
-    queryKey: ['stats'],
+    queryKey: ['stats', adminId],
     queryFn: async () => {
-      const response = await getStatsOverview();
+      const response = await getStatsOverview(adminId);
       if (!response.success) {
         // Return default stats instead of throwing to prevent UI crashes
         console.warn('Failed to fetch stats:', response.error);
@@ -68,10 +72,13 @@ export function useStats() {
 
 // Users query
 export function useUsers() {
+  const { selectedAdminId } = useAuth();
+  const adminId = selectedAdminId !== 'system' ? selectedAdminId : undefined;
+
   return useQuery({
-    queryKey: ['users'],
+    queryKey: ['users', adminId],
     queryFn: async () => {
-      const response = await getUsers();
+      const response = await getUsers(adminId);
       if (!response.success) {
         console.warn('Failed to fetch users:', response.error);
         return []; // Return empty array instead of throwing
@@ -85,10 +92,13 @@ export function useUsers() {
 
 // Students query
 export function useStudents() {
+  const { selectedAdminId } = useAuth();
+  const adminId = selectedAdminId !== 'system' ? selectedAdminId : undefined;
+
   return useQuery({
-    queryKey: ['students'],
+    queryKey: ['students', adminId],
     queryFn: async () => {
-      const response = await getStudents();
+      const response = await getStudents(adminId);
       if (!response.success) {
         console.warn('Failed to fetch students:', response.error);
         return []; // Return empty array instead of throwing
@@ -491,10 +501,13 @@ export function useDeleteUser() {
 
 // Whitelist queries and mutations
 export function useWhitelist() {
+  const { selectedAdminId } = useAuth();
+  const adminId = selectedAdminId !== 'system' ? selectedAdminId : undefined;
+
   return useQuery({
-    queryKey: ['whitelist'],
+    queryKey: ['whitelist', adminId],
     queryFn: async () => {
-      const response = await getWhitelist();
+      const response = await getWhitelist(adminId);
       if (!response.success) {
         console.warn('Failed to fetch whitelist:', response.error);
         return []; // Return empty array instead of throwing
@@ -593,10 +606,13 @@ export function useUpdateWhitelistEntry() {
 
 // Blacklist queries and mutations
 export function useBlacklist() {
+  const { selectedAdminId } = useAuth();
+  const adminId = selectedAdminId !== 'system' ? selectedAdminId : undefined;
+
   return useQuery({
-    queryKey: ['blacklist'],
+    queryKey: ['blacklist', adminId],
     queryFn: async () => {
-      const response = await getBlacklist();
+      const response = await getBlacklist(adminId);
       if (!response.success) {
         console.warn('Failed to fetch blacklist:', response.error);
         return []; // Return empty array instead of throwing

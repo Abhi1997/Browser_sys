@@ -181,11 +181,24 @@ function enforceSuperAdminReadOnly($user, $action = 'modify') {
 }
 
 /**
+ * If the user is a superadmin/superuser AND there is a validated ?admin_id query 
+ * parameter, we return that specific admin_id instead of null. 
+ * Otherwise, we fallback to their underlying db-based admin_id.
+ */
+function getRequestedAdminId($user) {
+    if ((isSuperuser($user) || isSuperAdmin($user)) && !empty($_GET['admin_id'])) {
+        $reqAdminId = (int)$_GET['admin_id'];
+        if ($reqAdminId > 0) return $reqAdminId;
+    }
+    return getUserAdminId($user);
+}
+
+/**
  * Build WHERE clause for admin_id filtering.
  * Returns [clause, params] where clause is " AND admin_id = ?" or "" for superadmin.
  */
 function adminIdFilter($user, $tableAlias = '') {
-    $adminId = getUserAdminId($user);
+    $adminId = getRequestedAdminId($user);
     if ($adminId === null) {
         return ['', []]; // Superadmin sees all
     }

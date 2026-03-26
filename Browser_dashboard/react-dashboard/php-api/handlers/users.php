@@ -13,8 +13,8 @@ function users_list() {
     $pdo = db();
     $role = strtolower($user['role'] ?? '');
     
-    // Superuser and Superadmin see all users
-    if (isSuperuser($user) || isSuperAdmin($user)) {
+    // Superuser and Superadmin see all users unless filtering by a specific admin
+    if ((isSuperuser($user) || isSuperAdmin($user)) && empty($_GET['admin_id'])) {
         $rows = $pdo->query("
             SELECT id, username, gmail, role, admin_id, is_active, created_at, last_login 
             FROM Users 
@@ -24,9 +24,9 @@ function users_list() {
         return;
     }
     
-    // Admin sees users under them (teachers with their admin_id, and students from Students table)
-    if ($role === 'admin') {
-        $adminId = getUserAdminId($user);
+    // Admin sees users under them (or Superadmin filtering by a specific admin)
+    if ($role === 'admin' || ((isSuperuser($user) || isSuperAdmin($user)) && !empty($_GET['admin_id']))) {
+        $adminId = getRequestedAdminId($user);
         $stmt = $pdo->prepare("
             SELECT u.id, u.username, u.gmail, u.role, u.admin_id, u.is_active, u.created_at, u.last_login 
             FROM Users u
@@ -400,12 +400,12 @@ function teachers_list() {
     
     $pdo = db();
     
-    if (isSuperuser($user) || isSuperAdmin($user)) {
+    if ((isSuperuser($user) || isSuperAdmin($user)) && empty($_GET['admin_id'])) {
         // Superuser and Superadmin see all teachers
         $rows = $pdo->query("SELECT id, username, gmail, admin_id, is_active, created_at FROM Users WHERE role = 'teacher' ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        // Admin sees only their teachers
-        $adminId = getUserAdminId($user);
+        // Admin sees only their teachers (or Superadmin filtering by admin)
+        $adminId = getRequestedAdminId($user);
         $stmt = $pdo->prepare("SELECT id, username, gmail, admin_id, is_active, created_at FROM Users WHERE role = 'teacher' AND admin_id = ? ORDER BY username");
         $stmt->execute([$adminId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);

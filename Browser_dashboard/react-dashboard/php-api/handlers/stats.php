@@ -61,8 +61,8 @@ function stats() {
     $pdo = db();
     $role = strtolower($user['role'] ?? '');
     
-    // Superuser and Superadmin see global stats
-    if (isSuperuser($user) || isSuperAdmin($user)) {
+    // Superuser and Superadmin see global stats unless specifically targeting an admin
+    if ((isSuperuser($user) || isSuperAdmin($user)) && empty($_GET['admin_id'])) {
         $total = (int)$pdo->query("SELECT COUNT(*) FROM Users")->fetchColumn();
         $active = (int)$pdo->query("SELECT COUNT(*) FROM Users WHERE is_active = 1")->fetchColumn();
         $roles = [];
@@ -97,8 +97,8 @@ function stats() {
         return;
     }
     
-    // Admin sees stats for their own data only
-    $adminId = getUserAdminId($user);
+    // Admin sees stats for their own data only (or Superadmin filtering by admin)
+    $adminId = getRequestedAdminId($user);
     list($adminClause, $adminParams) = adminIdFilter($user);
     
     $totalTeachers = 0;
