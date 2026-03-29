@@ -16,6 +16,7 @@ import {
 import { AdminSwitcher } from '@/components/super/AdminSwitcher';
 import { DashboardSwitcher } from '@/components/super/DashboardSwitcher';
 import { NotificationsPanel } from '@/components/shared/NotificationsPanel';
+import { SettingsMenu } from '@/components/shared/SettingsMenu';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -60,7 +61,13 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
             )}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Google Translate Widget Container */}
+            <div id="google_translate_element" className="hidden lg:block overflow-hidden rounded-md h-[40px] [&>div]:h-[40px] [&_select]:h-[40px] [&_select]:border-none [&_select]:bg-muted/50 [&_select]:text-sm [&_select]:font-medium [&_select]:text-foreground relative z-50"></div>
+
+            {/* Accessibility & Theme Settings */}
+            <SettingsMenu />
+
             {/* Notifications */}
             <Button
               variant="ghost"

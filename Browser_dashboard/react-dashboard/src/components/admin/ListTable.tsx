@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Globe, MoreHorizontal, Plus, Pencil, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Globe, MoreHorizontal, Plus, Pencil, Trash2, CheckCircle, XCircle, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +58,65 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newUrl, setNewUrl] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  const handleSort = (key: string) => {
+    setSortConfig(current => {
+      if (current?.key === key) {
+        if (current.direction === 'asc') return { key, direction: 'desc' };
+        return null;
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const SortIcon = ({ columnKey }: { columnKey: string }) => {
+    if (sortConfig?.key !== columnKey) return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> 
+      : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
+
+  const processedItems = useMemo(() => {
+    if (!items) return [];
+    
+    // Filter
+    let result = items.filter((i: any) => {
+      const desc = i.description || i.reason || '';
+      return (
+        i.url.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        desc.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        i.addedBy.toString().includes(searchTerm)
+      );
+    });
+
+    // Sort
+    if (sortConfig) {
+      result = [...result].sort((a: any, b: any) => {
+        let valA, valB;
+        switch (sortConfig.key) {
+          case 'url':
+            valA = a.url.toLowerCase(); valB = b.url.toLowerCase(); break;
+          case 'status':
+            valA = a.isActive ? 1 : 0; valB = b.isActive ? 1 : 0; break;
+          case 'addedBy':
+            valA = a.addedBy; valB = b.addedBy; break;
+          case 'addedAt':
+            valA = new Date(a.addedAt).getTime();
+            valB = new Date(b.addedAt).getTime();
+            break;
+          default:
+            return 0;
+        }
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return result;
+  }, [items, searchTerm, sortConfig]);
 
   const handleToggleStatus = (itemId: string) => {
     const item = items?.find((i: any) => i.id === itemId);
@@ -114,7 +173,11 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
   const columns = [
     {
       key: 'url',
-      header: 'URL',
+      header: (
+        <Button variant="ghost" onClick={() => handleSort('url')} className="-ml-4 hover:bg-transparent text-muted-foreground font-semibold">
+          URL <SortIcon columnKey="url" />
+        </Button>
+      ),
       render: (item: WhitelistEntry | BlacklistEntry) => (
         <div className="flex items-center gap-3">
           <div className={cn(
@@ -137,7 +200,11 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
     },
     {
       key: 'status',
-      header: 'Status',
+      header: (
+        <Button variant="ghost" onClick={() => handleSort('status')} className="-ml-4 hover:bg-transparent text-muted-foreground font-semibold">
+          Status <SortIcon columnKey="status" />
+        </Button>
+      ),
       render: (item: WhitelistEntry | BlacklistEntry) => (
         <Badge variant="outline" className={
           item.isActive 
@@ -152,14 +219,22 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
     },
     {
       key: 'addedBy',
-      header: 'Added By',
+      header: (
+        <Button variant="ghost" onClick={() => handleSort('addedBy')} className="-ml-4 hover:bg-transparent text-muted-foreground font-semibold">
+          Added By <SortIcon columnKey="addedBy" />
+        </Button>
+      ),
       render: (item: WhitelistEntry | BlacklistEntry) => (
         <span className="text-muted-foreground text-sm">{item.addedBy}</span>
       ),
     },
     {
       key: 'addedAt',
-      header: 'Added',
+      header: (
+        <Button variant="ghost" onClick={() => handleSort('addedAt')} className="-ml-4 hover:bg-transparent text-muted-foreground font-semibold">
+          Added <SortIcon columnKey="addedAt" />
+        </Button>
+      ),
       render: (item: WhitelistEntry | BlacklistEntry) => (
         <span className="text-muted-foreground text-sm">
           {new Date(item.addedAt).toLocaleDateString()}
@@ -211,30 +286,42 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
   return (
     <>
       <div className="glass-card p-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h3 className="text-lg font-semibold text-foreground capitalize">{type}</h3>
             <p className="text-sm text-muted-foreground">
               {isWhitelist ? 'Allowed URLs' : 'Blocked URLs'}
             </p>
           </div>
-          {!readOnly && (
-            <Button 
-              onClick={() => setIsAddDialogOpen(true)}
-              className={cn(
-                "gap-2",
-                isWhitelist 
-                  ? "bg-success hover:bg-success/90 text-success-foreground" 
-                  : "bg-destructive hover:bg-destructive/90"
-              )}
-            >
-              <Plus className="h-4 w-4" />
-              Add URL
-            </Button>
-          )}
+          
+          <div className="flex items-center gap-4">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search URLs..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            {!readOnly && (
+              <Button 
+                onClick={() => setIsAddDialogOpen(true)}
+                className={cn(
+                  "gap-2 whitespace-nowrap",
+                  isWhitelist 
+                    ? "bg-success hover:bg-success/90 text-success-foreground" 
+                    : "bg-destructive hover:bg-destructive/90"
+                )}
+              >
+                <Plus className="h-4 w-4" />
+                Add URL
+              </Button>
+            )}
+          </div>
         </div>
         <DataTable
-          data={items || []}
+          data={processedItems}
           columns={columns as any}
           emptyMessage={`No URLs in ${type}`}
         />

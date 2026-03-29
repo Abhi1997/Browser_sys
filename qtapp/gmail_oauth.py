@@ -6,8 +6,9 @@ Handles OAuth 2.0 authentication flow with Google
 import os
 import json
 from urllib.parse import urlparse, parse_qs
-from PyQt6.QtCore import QUrl, QObject, pyqtSignal
-from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtCore import QUrl, QObject, pyqtSignal, QThread
+import webbrowser
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QProgressBar, QWidget,
     QPushButton, QHBoxLayout, QMessageBox, QLineEdit, QApplication
@@ -21,8 +22,71 @@ try:
 except ImportError:
     requests = None
 
+class OAuthCallbackHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        parsed_path = urlparse(self.path)
+        if parsed_path.path == '/callback':
+            params = parse_qs(parsed_path.query)
+            if 'code' in params:
+                self.server.oauth_code = params['code'][0]
+                self.server.oauth_error = None
+                
+                # Send success response
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                self.wfile.write(b"<html><head><title>Authentication Successful</title></head><body style='font-family: sans-serif; text-align: center; padding-top: 50px;'><h2>Authentication successful!</h2><p>You can close this tab and return to the application.</p><script>window.setTimeout(function(){window.close();}, 3000);</script></body></html>")
+            else:
+                self.server.oauth_code = None
+                error = params.get('error', ['Unknown error'])[0]
+                error_desc = params.get('error_description', [''])[0]
+                self.server.oauth_error = f"{error}: {error_desc}"
+                
+                # Send error response
+                self.send_response(400)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                self.wfile.write(b"<html><head><title>Authentication Failed</title></head><body style='font-family: sans-serif; text-align: center; padding-top: 50px; color: red;'><h2>Authentication failed</h2><p>Please close this tab and try again.</p></body></html>")
+            
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        pass  # Suppress console logging
+
+class OAuthServerThread(QThread):
+    code_received = pyqtSignal(str)
+    error_received = pyqtSignal(str)
+
+    def __init__(self, port=8080):
+        super().__init__()
+        self.port = port
+        self.server = None
+
+    def run(self):
+        try:
+            self.server = HTTPServer(('localhost', self.port), OAuthCallbackHandler)
+            self.server.oauth_code = None
+            self.server.oauth_error = None
+            self.server.timeout = 0.5  # Check for interruption twice a second
+            
+            while not self.isInterruptionRequested() and self.server.oauth_code is None and self.server.oauth_error is None:
+                self.server.handle_request()
+            
+            if self.server.oauth_code:
+                self.code_received.emit(self.server.oauth_code)
+            elif self.server.oauth_error:
+                self.error_received.emit(self.server.oauth_error)
+                
+        except Exception as e:
+            self.error_received.emit(f"Server error: {str(e)}")
+        finally:
+            if self.server:
+                self.server.server_close()
+
 class GmailOAuth(QObject):
-    """Gmail OAuth handler using PyQt6 WebEngine"""
+    """Gmail OAuth handler using system default browser"""
     
     auth_success = pyqtSignal(str, str, int)  # gmail, role, user_id
     auth_failed = pyqtSignal(str)
@@ -64,8 +128,8 @@ class GmailOAuth(QObject):
             return None
         
         dialog = QDialog(parent)
-        dialog.setWindowTitle("Sign in with Google - DCES")
-        dialog.setMinimumSize(700, 750)
+        dialog.setWindowTitle("Sign in with Google")
+        dialog.setMinimumSize(400, 200)
         dialog.setStyleSheet("""
             QDialog {
                 background-color: #ffffff;
@@ -97,32 +161,53 @@ class GmailOAuth(QObject):
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(subtitle)
         
-        # Progress indicator (initially hidden)
-        self.progress_label = QLabel("Connecting to Google...")
+        # Progress indicator
+        self.progress_label = QLabel("A new browser window has been opened for Google sign-in.")
         self.progress_label.setStyleSheet("""
-            font-size: 12px;
+            font-size: 14px;
             color: #3b82f6;
             padding: 5px;
         """)
         self.progress_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.progress_label.hide()
         layout.addWidget(self.progress_label)
         
-        # Web view for OAuth
-        web_view = QWebEngineView()
-        web_view.setStyleSheet("border: 1px solid #e5e7eb; border-radius: 5px;")
-        layout.addWidget(web_view)
-        
         # Status label
-        self.status_label = QLabel("")
+        self.status_label = QLabel("Waiting for authentication callback on port 8080...")
         self.status_label.setStyleSheet("""
-            font-size: 11px;
+            font-size: 12px;
             color: #6b7280;
             padding: 5px;
             min-height: 20px;
         """)
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.status_label)
+        
+        # Build OAuth URL
+        auth_url = (
+            f"https://accounts.google.com/o/oauth2/v2/auth?"
+            f"client_id={self.client_id}&"
+            f"redirect_uri={self.redirect_uri}&"
+            f"response_type=code&"
+            f"scope=openid email profile&"
+            f"access_type=offline&"
+            f"prompt=select_account"
+        )
+        
+        # Start OAuth Background Listener Thread
+        self.server_thread = OAuthServerThread(port=8080)
+        
+        def handle_code(code):
+            self.server_thread.quit()
+            self._handle_oauth_code(code, dialog)
+            
+        def handle_error(error_msg):
+            self.server_thread.quit()
+            self.auth_failed.emit(f"Authentication was cancelled or failed:\n{error_msg}")
+            dialog.reject()
+            
+        self.server_thread.code_received.connect(handle_code)
+        self.server_thread.error_received.connect(handle_error)
+        self.server_thread.start()
         
         # Cancel button
         button_layout = QHBoxLayout()
@@ -141,70 +226,25 @@ class GmailOAuth(QObject):
                 background-color: #e5e7eb;
             }
         """)
-        cancel_btn.clicked.connect(dialog.reject)
+        
+        def on_cancel():
+            self.server_thread.requestInterruption()
+            self.server_thread.quit()
+            dialog.reject()
+            
+        cancel_btn.clicked.connect(on_cancel)
         button_layout.addWidget(cancel_btn)
         layout.addLayout(button_layout)
         
-        # Build OAuth URL
-        auth_url = (
-            f"https://accounts.google.com/o/oauth2/v2/auth?"
-            f"client_id={self.client_id}&"
-            f"redirect_uri={self.redirect_uri}&"
-            f"response_type=code&"
-            f"scope=openid email profile&"
-            f"access_type=offline&"
-            f"prompt=select_account"
-        )
+        # Open System Browser
+        webbrowser.open(auth_url)
         
-        def handle_url_changed(url):
-            url_str = url.toString()
-            
-            # Update status based on URL
-            if "accounts.google.com" in url_str:
-                self.status_label.setText("Please sign in with your Google account...")
-            elif "localhost:8080/callback" in url_str:
-                self.status_label.setText("Processing authentication...")
-                self.progress_label.show()
-                
-                # Extract authorization code
-                parsed = urlparse(url_str)
-                params = parse_qs(parsed.query)
-                code = params.get("code", [None])[0]
-                
-                if code:
-                    # Exchange code for token
-                    self._handle_oauth_code(code, dialog, web_view)
-                else:
-                    error = params.get("error", ["Unknown error"])[0]
-                    error_description = params.get("error_description", [""])[0]
-                    error_msg = f"Authentication was cancelled or failed: {error}"
-                    if error_description:
-                        error_msg += f"\n{error_description}"
-                    self.auth_failed.emit(error_msg)
-                    dialog.reject()
-            else:
-                self.status_label.setText("")
-        
-        def handle_load_started():
-            self.status_label.setText("Loading...")
-        
-        def handle_load_finished(ok):
-            if ok:
-                self.status_label.setText("")
-            else:
-                self.status_label.setText("Failed to load page. Please check your connection.")
-        
-        web_view.urlChanged.connect(handle_url_changed)
-        web_view.loadStarted.connect(handle_load_started)
-        web_view.loadFinished.connect(handle_load_finished)
-        
-        # Load OAuth URL
-        web_view.setUrl(QUrl(auth_url))
+        dialog.finished.connect(lambda: self.server_thread.requestInterruption())
         
         return dialog
     
-    def _handle_oauth_code(self, code, dialog, web_view):
-        """Handle OAuth authorization code"""
+    def _handle_oauth_code(self, code, dialog):
+        """Handle OAuth authorization code returned by system browser"""
         try:
             try:
                 import requests

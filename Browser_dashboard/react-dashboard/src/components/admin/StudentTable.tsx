@@ -18,7 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 const MODE_COLORS: Record<string, string> = {
   cached: 'bg-violet-500/20 text-violet-700 border-violet-500/30',
@@ -38,6 +40,9 @@ export function StudentTable() {
   const { data: students, isLoading } = useStudents();
   const { user } = useAuth();
   const updateMode = useUpdateStudentMode();
+  
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [sortConfig, setSortConfig] = React.useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   const handleModeChange = (studentId: string, newMode: string) => {
     if (user?.id) {
@@ -48,6 +53,58 @@ export function StudentTable() {
       });
     }
   };
+
+  const handleSort = (key: string) => {
+    setSortConfig(current => {
+      if (current?.key === key) {
+        if (current.direction === 'asc') return { key, direction: 'desc' };
+        return null;
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const SortIcon = ({ columnKey }: { columnKey: string }) => {
+    if (sortConfig?.key !== columnKey) return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> 
+      : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
+
+  const processedStudents = React.useMemo(() => {
+    if (!students) return [];
+    
+    // Filter
+    let result = students.filter(s => 
+      s.studentId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.gmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.assignedMode?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Sort
+    if (sortConfig) {
+      result = [...result].sort((a, b) => {
+        let valA, valB;
+        switch (sortConfig.key) {
+          case 'student':
+            valA = a.studentId?.toLowerCase(); valB = b.studentId?.toLowerCase(); break;
+          case 'mode':
+            valA = a.assignedMode; valB = b.assignedMode; break;
+          case 'violations':
+            valA = a.violationCount || 0; valB = b.violationCount || 0; break;
+          case 'status':
+            valA = a.isActive ? 1 : 0; valB = b.isActive ? 1 : 0; break;
+          default:
+            return 0;
+        }
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return result;
+  }, [students, searchTerm, sortConfig]);
 
   if (isLoading) {
     return (
@@ -71,7 +128,11 @@ export function StudentTable() {
   const columns = [
     {
       key: 'student',
-      header: 'Student',
+      header: (
+        <Button variant="ghost" onClick={() => handleSort('student')} className="-ml-4 hover:bg-transparent text-muted-foreground font-semibold">
+          Student <SortIcon columnKey="student" />
+        </Button>
+      ),
       render: (item: any) => (
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
@@ -86,7 +147,11 @@ export function StudentTable() {
     },
     {
       key: 'mode',
-      header: 'Mode',
+      header: (
+        <Button variant="ghost" onClick={() => handleSort('mode')} className="-ml-4 hover:bg-transparent text-muted-foreground font-semibold">
+          Mode <SortIcon columnKey="mode" />
+        </Button>
+      ),
       render: (item: any) => {
         const ModeIcon = MODE_ICONS[item.assignedMode] || AlertCircle;
         return (
@@ -101,7 +166,11 @@ export function StudentTable() {
     },
     {
       key: 'violations',
-      header: 'Violations',
+      header: (
+        <Button variant="ghost" onClick={() => handleSort('violations')} className="-ml-4 hover:bg-transparent text-muted-foreground font-semibold">
+          Violations <SortIcon columnKey="violations" />
+        </Button>
+      ),
       render: (item: any) => (
         <span className={`text-sm ${item.violationCount > 0 ? 'text-warning' : 'text-muted-foreground'}`}>
           {item.violationCount || 0}
@@ -110,7 +179,11 @@ export function StudentTable() {
     },
     {
       key: 'status',
-      header: 'Status',
+      header: (
+        <Button variant="ghost" onClick={() => handleSort('status')} className="-ml-4 hover:bg-transparent text-muted-foreground font-semibold">
+          Status <SortIcon columnKey="status" />
+        </Button>
+      ),
       render: (item: any) => (
         <Badge variant={item.isActive ? 'default' : 'secondary'} className={
           item.isActive 
@@ -145,14 +218,23 @@ export function StudentTable() {
 
   return (
     <div className="glass-card p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h3 className="text-lg font-semibold text-foreground">Students</h3>
           <p className="text-sm text-muted-foreground">Manage student modes and monitor activity</p>
         </div>
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search students..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8"
+          />
+        </div>
       </div>
       <DataTable
-        data={students}
+        data={processedStudents}
         columns={columns as any}
         emptyMessage="No students found"
       />

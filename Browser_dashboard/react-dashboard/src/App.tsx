@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import SuperuserDashboard from "./pages/SuperuserDashboard";
@@ -49,77 +50,79 @@ if (typeof console !== 'undefined' && console.warn) {
 
 // Using BrowserRouter for production URLs (abhinavpaudel.com/dashboard-role)
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            
-            <Route
-              path="/dashboard-superuser"
-              element={
-                <ProtectedRoute>
-                  <SuperuserDashboard />
-                </ProtectedRoute>
-              }
-            />
-            
-            <Route
-              path="/dashboard-superadmin"
-              element={
-                <ProtectedRoute>
-                  <SuperAdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            
-            <Route
-              path="/dashboard-admin"
-              element={
-                <ProtectedRoute>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            
-            <Route
-              path="/dashboard-teacher"
-              element={
-                <ProtectedRoute>
-                  <TeacherDashboard />
-                </ProtectedRoute>
-              }
-            />
+  <SettingsProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              
+              <Route
+                path="/dashboard-superuser"
+                element={
+                  <ProtectedRoute>
+                    <SuperuserDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              
+              <Route
+                path="/dashboard-superadmin"
+                element={
+                  <ProtectedRoute>
+                    <SuperAdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              
+              <Route
+                path="/dashboard-admin"
+                element={
+                  <ProtectedRoute>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              
+              <Route
+                path="/dashboard-teacher"
+                element={
+                  <ProtectedRoute>
+                    <TeacherDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/history"
-              element={
-                <ProtectedRoute>
-                  <History />
-                </ProtectedRoute>
-              }
-            />
-            
-            <Route path="/unauthorized" element={<Unauthorized />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/history"
+                element={
+                  <ProtectedRoute>
+                    <History />
+                  </ProtectedRoute>
+                }
+              />
+              
+              <Route path="/unauthorized" element={<Unauthorized />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </SettingsProvider>
 );
 
 export default App;
