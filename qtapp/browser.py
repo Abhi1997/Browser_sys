@@ -744,6 +744,11 @@ class MainWindow(QMainWindow):
         edit_profile_act = QAction("Edit Profile", self)
         edit_profile_act.triggered.connect(self.show_profile_dialog)
         profile_menu.addAction(edit_profile_act)
+        
+        profile_menu.addSeparator()
+        logout_act = QAction("Logout", self)
+        logout_act.triggered.connect(self.logout)
+        profile_menu.addAction(logout_act)
 
         # Settings Menu
         settings_menu = menubar.addMenu("&Settings")
@@ -756,6 +761,29 @@ class MainWindow(QMainWindow):
         self.set_homepage_act = QAction("Set Homepage", self)
         self.set_homepage_act.triggered.connect(self._set_homepage)
         settings_menu.addAction(self.set_homepage_act)
+
+    def logout(self):
+        """Clear persistent session and restart the application."""
+        from PyQt6.QtCore import QSettings
+        from PyQt6.QtWidgets import QMessageBox
+        import sys
+        import os
+        
+        settings = QSettings("EduBrowser", "Settings")
+        settings.remove("device_fingerprint")
+        settings.remove("user_id")
+        settings.remove("user_role")
+        settings.remove("username")
+        settings.remove("gmail")
+        
+        QMessageBox.information(
+            self, 
+            "Logged Out", 
+            "You have been securely logged out. The application will now restart."
+        )
+        
+        # Safely detach and execute a fresh process instance
+        os.execl(sys.executable, sys.executable, *sys.argv)
 
     def _set_homepage(self):
         """Prompt user for a custom homepage URL and save it locally."""

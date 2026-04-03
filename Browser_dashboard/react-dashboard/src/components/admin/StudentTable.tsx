@@ -42,6 +42,7 @@ export function StudentTable() {
   const updateMode = useUpdateStudentMode();
   
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchColumn, setSearchColumn] = React.useState('all');
   const [sortConfig, setSortConfig] = React.useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   const handleModeChange = (studentId: string, newMode: string) => {
@@ -75,11 +76,26 @@ export function StudentTable() {
     if (!students) return [];
     
     // Filter
-    let result = students.filter(s => 
-      s.studentId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.gmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.assignedMode?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    let result = students.filter((s: any) => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      
+      switch (searchColumn) {
+        case 'studentId':
+          return s.studentId?.toLowerCase().includes(term);
+        case 'gmail':
+          return s.gmail?.toLowerCase().includes(term);
+        case 'mode':
+          return s.assignedMode?.toLowerCase().includes(term);
+        case 'all':
+        default:
+          return (
+            s.studentId?.toLowerCase().includes(term) ||
+            s.gmail?.toLowerCase().includes(term) ||
+            s.assignedMode?.toLowerCase().includes(term)
+          );
+      }
+    });
 
     // Sort
     if (sortConfig) {
@@ -223,14 +239,29 @@ export function StudentTable() {
           <h3 className="text-lg font-semibold text-foreground">Students</h3>
           <p className="text-sm text-muted-foreground">Manage student modes and monitor activity</p>
         </div>
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search students..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8"
-          />
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex shadow-sm rounded-md grow group">
+            <Select value={searchColumn} onValueChange={setSearchColumn}>
+              <SelectTrigger className="w-[130px] rounded-r-none border-r-0 focus:ring-0 focus:border-input bg-muted/50 transition-colors hover:bg-muted font-medium cursor-pointer">
+                <SelectValue placeholder="Filter by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Fields</SelectItem>
+                <SelectItem value="studentId">Student ID</SelectItem>
+                <SelectItem value="gmail">Email</SelectItem>
+                <SelectItem value="mode">Mode</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative w-full sm:w-56 group-hover:border-primary/50 transition-colors">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Input
+                placeholder="Search students..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 rounded-l-none border-l-0 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:border-primary transition-all"
+              />
+            </div>
+          </div>
         </div>
       </div>
       <DataTable

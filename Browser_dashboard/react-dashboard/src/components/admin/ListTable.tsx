@@ -12,6 +12,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -59,6 +66,7 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
   const [newUrl, setNewUrl] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchColumn, setSearchColumn] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   const handleSort = (key: string) => {
@@ -83,12 +91,25 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
     
     // Filter
     let result = items.filter((i: any) => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
       const desc = i.description || i.reason || '';
-      return (
-        i.url.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        desc.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        i.addedBy.toString().includes(searchTerm)
-      );
+      
+      switch (searchColumn) {
+        case 'url':
+          return i.url.toLowerCase().includes(term);
+        case 'description':
+          return desc.toLowerCase().includes(term);
+        case 'addedBy':
+          return i.addedBy?.toString().toLowerCase().includes(term);
+        case 'all':
+        default:
+          return (
+            i.url.toLowerCase().includes(term) ||
+            desc.toLowerCase().includes(term) ||
+            i.addedBy?.toString().toLowerCase().includes(term)
+          );
+      }
     });
 
     // Sort
@@ -294,21 +315,34 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
             </p>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search URLs..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-              />
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+            <div className="flex shadow-sm rounded-md grow group">
+              <Select value={searchColumn} onValueChange={setSearchColumn}>
+                <SelectTrigger className="w-[130px] rounded-r-none border-r-0 focus:ring-0 focus:border-input bg-muted/50 transition-colors hover:bg-muted font-medium cursor-pointer">
+                  <SelectValue placeholder="Filter by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Fields</SelectItem>
+                  <SelectItem value="url">URL</SelectItem>
+                  <SelectItem value="description">Description</SelectItem>
+                  <SelectItem value="addedBy">Added By</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="relative w-full sm:w-56 group-hover:border-primary/50 transition-colors">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                <Input
+                  placeholder="Search URLs..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 rounded-l-none border-l-0 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:border-primary transition-all"
+                />
+              </div>
             </div>
             {!readOnly && (
               <Button 
                 onClick={() => setIsAddDialogOpen(true)}
                 className={cn(
-                  "gap-2 whitespace-nowrap",
+                  "gap-2 whitespace-nowrap hidden sm:flex",
                   isWhitelist 
                     ? "bg-success hover:bg-success/90 text-success-foreground" 
                     : "bg-destructive hover:bg-destructive/90"
@@ -319,6 +353,20 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
               </Button>
             )}
           </div>
+          {!readOnly && (
+            <Button 
+              onClick={() => setIsAddDialogOpen(true)}
+              className={cn(
+                "gap-2 whitespace-nowrap w-full sm:hidden mt-2",
+                isWhitelist 
+                  ? "bg-success hover:bg-success/90 text-success-foreground" 
+                  : "bg-destructive hover:bg-destructive/90"
+              )}
+            >
+              <Plus className="h-4 w-4" />
+              Add URL
+            </Button>
+          )}
         </div>
         <DataTable
           data={processedItems}

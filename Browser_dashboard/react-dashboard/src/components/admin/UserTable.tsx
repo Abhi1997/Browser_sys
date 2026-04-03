@@ -15,6 +15,13 @@ import { formatRole, getRoleBadgeClass } from '@/lib/auth';
 import { useUsers, useToggleUserStatus, useDeleteUser } from '@/hooks/useDashboardData';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface UserTableProps {
@@ -27,6 +34,7 @@ export function UserTable({ readOnly = false }: UserTableProps) {
   const deleteUser = useDeleteUser();
 
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [searchColumn, setSearchColumn] = React.useState('all');
   const [sortConfig, setSortConfig] = React.useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   const handleToggleStatus = (userId: string) => {
@@ -60,11 +68,26 @@ export function UserTable({ readOnly = false }: UserTableProps) {
     if (!users) return [];
     
     // Filter
-    let result = users.filter(u => 
-      u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.role.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    let result = users.filter((u: User) => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      
+      switch (searchColumn) {
+        case 'username':
+          return u.username.toLowerCase().includes(term);
+        case 'email':
+          return u.email.toLowerCase().includes(term);
+        case 'role':
+          return u.role.toLowerCase().includes(term);
+        case 'all':
+        default:
+          return (
+            u.username.toLowerCase().includes(term) ||
+            u.email.toLowerCase().includes(term) ||
+            u.role.toLowerCase().includes(term)
+          );
+      }
+    });
 
     // Sort
     if (sortConfig) {
@@ -245,15 +268,28 @@ export function UserTable({ readOnly = false }: UserTableProps) {
           <p className="text-sm text-muted-foreground">Manage user accounts</p>
         </div>
         
-        <div className="flex items-center gap-4">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8"
-            />
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex shadow-sm rounded-md grow group">
+            <Select value={searchColumn} onValueChange={setSearchColumn}>
+              <SelectTrigger className="w-[130px] rounded-r-none border-r-0 focus:ring-0 focus:border-input bg-muted/50 transition-colors hover:bg-muted font-medium cursor-pointer">
+                <SelectValue placeholder="Filter by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Fields</SelectItem>
+                <SelectItem value="username">Name</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="role">Role</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative w-full sm:w-56 group-hover:border-primary/50 transition-colors">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Input
+                placeholder="Search users..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 rounded-l-none border-l-0 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:border-primary transition-all"
+              />
+            </div>
           </div>
           {!readOnly && (
             <Button className="gap-2 whitespace-nowrap">

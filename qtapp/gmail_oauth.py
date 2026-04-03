@@ -35,7 +35,22 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
-                self.wfile.write(b"<html><head><title>Authentication Successful</title></head><body style='font-family: sans-serif; text-align: center; padding-top: 50px;'><h2>Authentication successful!</h2><p>You can close this tab and return to the application.</p><script>window.setTimeout(function(){window.close();}, 3000);</script></body></html>")
+                
+                success_html = """
+                <html>
+                <head>
+                    <title>Authentication Successful</title>
+                    <link rel="icon" type="image/png" href="/favicon.ico">
+                </head>
+                <body style='font-family: sans-serif; text-align: center; padding-top: 50px;'>
+                    <img src="/favicon.ico" width="80" alt="DCES Logo" style="margin-bottom: 20px;" />
+                    <h2>Authentication successful!</h2>
+                    <p>You can close this tab and return to the application.</p>
+                    <script>window.setTimeout(function(){window.close();}, 3000);</script>
+                </body>
+                </html>
+                """
+                self.wfile.write(success_html.encode('utf-8'))
             else:
                 self.server.oauth_code = None
                 error = params.get('error', ['Unknown error'])[0]
@@ -46,8 +61,35 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
                 self.send_response(400)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
-                self.wfile.write(b"<html><head><title>Authentication Failed</title></head><body style='font-family: sans-serif; text-align: center; padding-top: 50px; color: red;'><h2>Authentication failed</h2><p>Please close this tab and try again.</p></body></html>")
-            
+                
+                error_html = """
+                <html>
+                <head>
+                    <title>Authentication Failed</title>
+                    <link rel="icon" type="image/png" href="/favicon.ico">
+                </head>
+                <body style='font-family: sans-serif; text-align: center; padding-top: 50px; color: red;'>
+                    <img src="/favicon.ico" width="80" alt="DCES Logo" style="margin-bottom: 20px;" />
+                    <h2>Authentication failed</h2>
+                    <p>Please close this tab and try again.</p>
+                </body>
+                </html>
+                """
+                self.wfile.write(error_html.encode('utf-8'))
+                
+        elif parsed_path.path == '/favicon.ico':
+            import os
+            # Serve the DCES logo as the favicon
+            logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logo', 'DCES logo.png')
+            if os.path.exists(logo_path):
+                self.send_response(200)
+                self.send_header('Content-type', 'image/png')
+                self.end_headers()
+                with open(logo_path, 'rb') as f:
+                    self.wfile.write(f.read())
+            else:
+                self.send_response(404)
+                self.end_headers()
         else:
             self.send_response(404)
             self.end_headers()
@@ -576,6 +618,35 @@ class GmailLoginWindow(QDialog):
         self.oauth = GmailOAuth(self.auth)
         self.oauth.auth_success.connect(self.on_oauth_success)
         self.oauth.auth_failed.connect(self.on_oauth_failed)
+        
+        # Check for persistent device-bound session
+        from PyQt6.QtCore import QSettings, QTimer
+        settings = QSettings("EduBrowser", "Settings")
+        saved_fingerprint = settings.value("device_fingerprint", None)
+        user_id = settings.value("user_id", None)
+        
+        if saved_fingerprint and user_id:
+            try:
+                current_fingerprint = self.auth.get_device_info()["device_fingerprint"]
+                if saved_fingerprint == current_fingerprint:
+                    # Valid device session
+                    self.login_successful = True
+                    self.user_role = settings.value("user_role")
+                    self.username = settings.value("username")
+                    self.user_id = user_id
+                    self.gmail = settings.value("gmail")
+                    
+                    # Accept the dialog immediately in the event loop
+                    QTimer.singleShot(0, self.accept)
+                else:
+                    # Invalid/copied session, wipe it
+                    settings.remove("device_fingerprint")
+                    settings.remove("user_id")
+                    settings.remove("user_role")
+                    settings.remove("username")
+                    settings.remove("gmail")
+            except Exception:
+                pass
     
     def handle_gmail_login(self):
         """Start Gmail OAuth flow"""
@@ -606,6 +677,16 @@ class GmailLoginWindow(QDialog):
         try:
             device_info = self.auth.get_device_info()
             self.auth.register_device(user_id, device_info)
+            
+            # Save persistent session to QSettings
+            from PyQt6.QtCore import QSettings
+            settings = QSettings("EduBrowser", "Settings")
+            settings.setValue("user_role", role)
+            settings.setValue("username", self.username)
+            settings.setValue("user_id", user_id)
+            settings.setValue("gmail", gmail)
+            settings.setValue("device_fingerprint", device_info["device_fingerprint"])
+            
         except Exception as e:
             # Log but don't fail login if device registration fails
             print(f"Warning: Device registration failed: {e}")
@@ -754,6 +835,15 @@ class GmailLoginWindow(QDialog):
             # Register device
             device_info = self.auth.get_device_info()
             self.auth.register_device(user_id, device_info)
+            
+            # Save persistent session to QSettings
+            from PyQt6.QtCore import QSettings
+            settings = QSettings("EduBrowser", "Settings")
+            settings.setValue("user_role", role)
+            settings.setValue("username", username)
+            settings.setValue("user_id", user_id)
+            settings.setValue("gmail", getattr(self, "gmail", None))
+            settings.setValue("device_fingerprint", device_info["device_fingerprint"])
             
             QMessageBox.information(self, "Login Successful", 
                                   f"Welcome, {username}! Role: {role}")
