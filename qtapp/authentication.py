@@ -67,41 +67,49 @@ class Authentication:
                 pass  # Invalid port, ignore
         
         self.database = os.getenv("DB_NAME", os.getenv("DATABASE", database))
+        self._db_pool = None
         
     def _get_conn(self):
-        """Get connection to database"""
+        """Get connection to database using a local connection pool"""
         config = self.db_base_config.copy()
         config["database"] = self.database
         
-        # Try connection
-        # Note: If MySQL 8.0+ authentication fails, the user may need to:
-        # 1. Upgrade mysql-connector-python to a version that supports allow_public_key_retrieval
-        # 2. Or change MySQL user authentication method to mysql_native_password
+        # Initialize the pool on first request
+        if not self._db_pool:
+            try:
+                # Local client instances only need a size 1 or 2 pool natively
+                self._db_pool = mysql.connector.pooling.MySQLConnectionPool(
+                    pool_name="qtapp_pool",
+                    pool_size=2,
+                    pool_reset_session=True,
+                    **config
+                )
+            except Exception as e:
+                # If pool init fails (auth issues), fall back to checking if we need allow_public_key_retrieval
+                error_str = str(e).lower()
+                if "access denied" in error_str or ("authentication" in error_str and "caching_sha2_password" in error_str):
+                    try:
+                        import inspect
+                        sig = inspect.signature(mysql.connector.connect)
+                        if "allow_public_key_retrieval" in sig.parameters:
+                            config_with_key = config.copy()
+                            config_with_key["allow_public_key_retrieval"] = True
+                            self._db_pool = mysql.connector.pooling.MySQLConnectionPool(
+                                pool_name="qtapp_pool",
+                                pool_size=2,
+                                pool_reset_session=True,
+                                **config_with_key
+                            )
+                    except Exception:
+                        pass
+                
+                if not self._db_pool:
+                    raise ConnectionError(f"Database pool initialization failed: {str(e)}") from e
+        
         try:
-            return mysql.connector.connect(**config)
+            return self._db_pool.get_connection()
         except Exception as e:
-            # Check if it's an authentication error that might need allow_public_key_retrieval
-            error_str = str(e).lower()
-            if "access denied" in error_str or ("authentication" in error_str and "caching_sha2_password" in error_str):
-                # Try with allow_public_key_retrieval if connector supports it
-                try:
-                    import inspect
-                    sig = inspect.signature(mysql.connector.connect)
-                    if "allow_public_key_retrieval" in sig.parameters:
-                        config_with_key = config.copy()
-                        config_with_key["allow_public_key_retrieval"] = True
-                        return mysql.connector.connect(**config_with_key)
-                except (AttributeError, TypeError, Exception):
-                    # Parameter not supported or other issue
-                    # Raise original error with helpful message
-                    raise ConnectionError(
-                        f"Database connection failed: {str(e)}\n"
-                        f"If using MySQL 8.0+, you may need to:\n"
-                        f"1. Upgrade mysql-connector-python: pip install --upgrade mysql-connector-python\n"
-                        f"2. Or change MySQL user auth method to mysql_native_password"
-                    ) from e
-            # Raise original error for other issues
-            raise
+            raise ConnectionError(f"Failed to get pooled connection: {str(e)}") from e
     
     # Backward compatibility aliases
     def _get_auth_conn(self):

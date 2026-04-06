@@ -45,8 +45,28 @@ for field in required_db_fields:
     if not DB_CONFIG.get(field):
         raise ValueError(f"DB_{field.upper()} must be set in .env file")
 
+from mysql.connector import pooling
+
+# Initialize connection pool globally to limit redundant TCP handshakes
+db_pool = None
+try:
+    db_pool = mysql.connector.pooling.MySQLConnectionPool(
+        pool_name="dashboard_pool",
+        pool_size=5,
+        pool_reset_session=True,
+        **DB_CONFIG
+    )
+except Exception as e:
+    print(f"Warning: Failed to initialize database pool: {e}")
+
 def get_db_connection():
-    """Get database connection"""
+    """Get database connection from persistent hostinger pool"""
+    if db_pool:
+        try:
+            return db_pool.get_connection()
+        except mysql.connector.Error as e:
+            print(f"Pool exhausted or error, falling back: {e}")
+            return mysql.connector.connect(**DB_CONFIG)
     return mysql.connector.connect(**DB_CONFIG)
 
 def verify_jwt_token(token):
@@ -88,6 +108,22 @@ def require_auth(f):
         return f(*args, **kwargs)
     
     return decorated_function
+
+def log_admin_action(user_id, role, action, endpoint=None, ip_address=None):
+    """Securely route administrative events directly to DashboardLogs table."""
+    try:
+        if not user_id: return
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO DashboardLogs (user_id, role, action, endpoint, ip_address, created_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+        """, (user_id, role, action, endpoint, ip_address))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Warning: Failed to log backend action: {e}")
 
 # ==================== AUTHENTICATION ENDPOINTS ====================
 
@@ -303,9 +339,24 @@ def get_stats():
         except:
             blacklist_size = 0
         
-        # Total students (from Students table if exists, else Users with role=student)
+        user_id = request.current_user.get('userId') or request.current_user.get('user_id')
+        role = request.current_user.get('role')
+        admin_id_param = request.args.get('admin_id')
+        
+        student_where = ""
+        student_params = []
+        if role == 'teacher':
+            student_where = "WHERE teacher_id = %s"
+            student_params.append(user_id)
+        elif role == 'admin':
+            student_where = "WHERE admin_id = %s"
+            student_params.append(user_id)
+        elif role in ['superadmin', 'superuser'] and admin_id_param:
+            student_where = "WHERE admin_id = %s"
+            student_params.append(admin_id_param)
+
         try:
-            cursor.execute("SELECT COUNT(*) as total FROM Students")
+            cursor.execute(f"SELECT COUNT(*) as total FROM Students {student_where}", tuple(student_params))
             total_students = cursor.fetchone()['total']
         except:
             total_students = role_distribution.get('student', 0)
@@ -409,6 +460,18 @@ def create_user():
         
         cursor.close()
         conn.close()
+
+        # Log backend action structurally
+        try:
+            log_admin_action(
+                request.current_user.get('userId') or request.current_user.get('user_id'),
+                request.current_user.get('role'),
+                f"Created user: {data.get('username')}",
+                "/api/users",
+                request.remote_addr
+            )
+        except Exception:
+            pass
         
         return jsonify({
             "success": True,
@@ -462,6 +525,17 @@ def update_user(user_id):
         
         cursor.close()
         conn.close()
+
+        try:
+            log_admin_action(
+                request.current_user.get('userId') or request.current_user.get('user_id'),
+                request.current_user.get('role'),
+                f"Updated user ID {user_id}",
+                f"/api/users/{user_id}",
+                request.remote_addr
+            )
+        except Exception:
+            pass
         
         return jsonify({
             "success": True,
@@ -484,6 +558,17 @@ def delete_user(user_id):
         conn.commit()
         cursor.close()
         conn.close()
+
+        try:
+            log_admin_action(
+                request.current_user.get('userId') or request.current_user.get('user_id'),
+                request.current_user.get('role'),
+                f"Deleted user ID {user_id}",
+                f"/api/users/{user_id}",
+                request.remote_addr
+            )
+        except Exception:
+            pass
         
         return jsonify({
             "success": True,
@@ -521,6 +606,17 @@ def toggle_user_status(user_id):
         
         cursor.close()
         conn.close()
+
+        try:
+            log_admin_action(
+                request.current_user.get('userId') or request.current_user.get('user_id'),
+                request.current_user.get('role'),
+                f"Toggled status for user ID {user_id} to {new_status}",
+                f"/api/users/{user_id}/toggle-status",
+                request.remote_addr
+            )
+        except Exception:
+            pass
         
         return jsonify({
             "success": True,
@@ -537,29 +633,58 @@ def toggle_user_status(user_id):
 @app.route('/api/students', methods=['GET'])
 @require_auth
 def get_students():
-    """Get all students"""
+    user_id = request.current_user.get('userId') or request.current_user.get('user_id')
+    role = request.current_user.get('role')
+    admin_id_param = request.args.get('admin_id')
+    
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
+        # Build conditions based on role
+        where_clause = ""
+        params = []
+        
+        if role == 'teacher':
+            where_clause = "WHERE s.teacher_id = %s"
+            params.append(user_id)
+        elif role == 'admin':
+            where_clause = "WHERE s.admin_id = %s"
+            params.append(user_id)
+        elif role in ['superadmin', 'superuser'] and admin_id_param:
+            where_clause = "WHERE s.admin_id = %s"
+            params.append(admin_id_param)
+            
         # Query Students table - actual schema
         try:
-            cursor.execute("""
+            query = f"""
                 SELECT s.id, s.student_id, s.user_id, s.gmail, s.assigned_mode as mode, 
                        s.is_active, s.created_at, u.username
                 FROM Students s
                 LEFT JOIN Users u ON s.user_id = u.id
+                {where_clause}
                 ORDER BY s.created_at DESC
-            """)
+            """
+            cursor.execute(query, tuple(params))
         except Exception as e:
             # If Students table doesn't exist, try Users with student role
-            cursor.execute("""
+            fb_where = "WHERE role = 'student'"
+            fb_params = []
+            if role == 'admin':
+                fb_where += " AND admin_id = %s"
+                fb_params.append(user_id)
+            elif role in ['superadmin', 'superuser'] and admin_id_param:
+                fb_where += " AND admin_id = %s"
+                fb_params.append(admin_id_param)
+            
+            fb_query = f"""
                 SELECT id, id as student_id, username, gmail as email, is_active, 
                        'restricted' as mode, created_at
                 FROM Users 
-                WHERE role = 'student'
+                {fb_where}
                 ORDER BY created_at DESC
-            """)
+            """
+            cursor.execute(fb_query, tuple(fb_params))
         
         students = cursor.fetchall()
         cursor.close()
@@ -637,23 +762,48 @@ def get_activity():
     student_id = request.args.get('studentId')
     limit = int(request.args.get('limit', 100))
     
+    user_id_req = request.current_user.get('userId') or request.current_user.get('user_id')
+    role = request.current_user.get('role')
+    admin_id_param = request.args.get('admin_id')
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        # Query ActivityLogs - actual schema columns
-        query = """
-            SELECT id, student_id as studentId, user_id, url, visit_start as visitStart, 
-                   visit_duration as duration, created_at as createdAt, domain, mode
-            FROM ActivityLogs
-        """
+        join_clause = ""
+        where_clauses = []
         params = []
-        
+
+        if role == 'teacher':
+            join_clause = "JOIN Students s ON al.student_id = s.student_id"
+            where_clauses.append("s.teacher_id = %s")
+            params.append(user_id_req)
+        elif role == 'admin':
+            join_clause = "JOIN Students s ON al.student_id = s.student_id"
+            where_clauses.append("s.admin_id = %s")
+            params.append(user_id_req)
+        elif role in ['superadmin', 'superuser'] and admin_id_param:
+            join_clause = "JOIN Students s ON al.student_id = s.student_id"
+            where_clauses.append("s.admin_id = %s")
+            params.append(admin_id_param)
+
         if student_id:
-            query += " WHERE student_id = %s"
+            where_clauses.append("al.student_id = %s")
             params.append(student_id)
+
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
         
-        query += " ORDER BY visit_start DESC, created_at DESC LIMIT %s"
+        # Query ActivityLogs - actual schema columns
+        query = f"""
+            SELECT al.id, al.student_id as studentId, al.user_id, al.url, al.visit_start as visitStart, 
+                   al.visit_duration as duration, al.created_at as createdAt, al.domain, al.mode
+            FROM ActivityLogs al
+            {join_clause}
+            {where_sql}
+            ORDER BY al.visit_start DESC, al.created_at DESC LIMIT %s
+        """
         params.append(limit)
         
         try:
@@ -688,24 +838,49 @@ def get_violations():
     student_id = request.args.get('studentId')
     limit = int(request.args.get('limit', 100))
     
+    user_id_req = request.current_user.get('userId') or request.current_user.get('user_id')
+    role = request.current_user.get('role')
+    admin_id_param = request.args.get('admin_id')
+    
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        # Query Violations - actual schema columns
-        query = """
-            SELECT id, student_id as studentId, user_id, attempted_url as url, 
-                   violation_type, description as reason, created_at as timestamp, 
-                   created_at as createdAt, severity, current_mode
-            FROM Violations
-        """
+        join_clause = ""
+        where_clauses = []
         params = []
         
+        if role == 'teacher':
+            join_clause = "JOIN Students s ON v.student_id = s.student_id"
+            where_clauses.append("s.teacher_id = %s")
+            params.append(user_id_req)
+        elif role == 'admin':
+            join_clause = "JOIN Students s ON v.student_id = s.student_id"
+            where_clauses.append("s.admin_id = %s")
+            params.append(user_id_req)
+        elif role in ['superadmin', 'superuser'] and admin_id_param:
+            join_clause = "JOIN Students s ON v.student_id = s.student_id"
+            where_clauses.append("s.admin_id = %s")
+            params.append(admin_id_param)
+        
         if student_id:
-            query += " WHERE student_id = %s"
+            where_clauses.append("v.student_id = %s")
             params.append(student_id)
         
-        query += " ORDER BY timestamp DESC, createdAt DESC LIMIT %s"
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+        
+        # Query Violations - actual schema columns
+        query = f"""
+            SELECT v.id, v.student_id as studentId, v.user_id, v.attempted_url as url, 
+                   v.violation_type, v.description as reason, v.created_at as timestamp, 
+                   v.created_at as createdAt, v.severity, v.current_mode
+            FROM Violations v
+            {join_clause}
+            {where_sql}
+            ORDER BY v.created_at DESC LIMIT %s
+        """
         params.append(limit)
         
         try:
@@ -1086,6 +1261,65 @@ def get_admins():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+# ==================== SYSTEM ANALYTICS & LOGGING ====================
+
+@app.route('/api/analytics/top-sites', methods=['GET'])
+@require_auth
+def get_top_sites():
+    """Get the most visited domains historically across students, discarding google."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT 
+                SUBSTRING_INDEX(REPLACE(REPLACE(url, 'https://', ''), 'http://', ''), '/', 1) as domain,
+                COUNT(*) as visits
+            FROM BrowsingHistory
+            WHERE url NOT LIKE '%google.com%' AND url != '' AND url IS NOT NULL
+            GROUP BY domain
+            ORDER BY visits DESC
+            LIMIT 15
+        """)
+        results = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "data": results
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/logs/system', methods=['GET'])
+@require_auth
+def get_system_logs():
+    """Get raw administrative and login flows tracked within DashboardLogs."""
+    limit = int(request.args.get('limit', 100))
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        cursor.execute("""
+            SELECT d.id, d.user_id as userId, d.role, d.action, d.endpoint, 
+                   d.ip_address as ipAddress, d.device_id as deviceId, 
+                   d.created_at as createdAt, u.username
+            FROM DashboardLogs d
+            LEFT JOIN Users u ON d.user_id = u.id
+            ORDER BY d.created_at DESC
+            LIMIT %s
+        """, (limit,))
+        logs = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({"success": True, "data": logs})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 # ==================== HEALTH CHECK ====================
 

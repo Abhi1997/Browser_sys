@@ -61,6 +61,48 @@ function stats() {
     $pdo = db();
     $role = strtolower($user['role'] ?? '');
     
+    // Teacher sees only their assigned students
+    if ($role === 'teacher') {
+        $teacherId = $user['userId'] ?? $user['user_id'] ?? null;
+        $totalStudents = 0;
+        $wl = 0;
+        $bl = 0;
+        
+        try {
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM Students WHERE teacher_id = ?");
+            $stmt->execute([$teacherId]);
+            $totalStudents = (int)$stmt->fetchColumn();
+        } catch (Throwable $e) {}
+        
+        try {
+            $wl = (int)$pdo->query("SELECT COUNT(*) FROM WhitelistDomains WHERE is_active = 1")->fetchColumn();
+        } catch (Throwable $e) {}
+        
+        try {
+            $bl = (int)$pdo->query("SELECT COUNT(*) FROM BlacklistDomains WHERE is_active = 1")->fetchColumn();
+        } catch (Throwable $e) {}
+        
+        jsonResp([
+            'success' => true,
+            'data' => [
+                'totalUsers' => $totalStudents + 1,
+                'totalStudents' => $totalStudents,
+                'activeUsers' => 0,
+                'activeSessions' => 0,
+                'roleDistribution' => [
+                    'admin' => 0,
+                    'teacher' => 1,
+                    'student' => $totalStudents,
+                ],
+                'whitelistSize' => $wl,
+                'blacklistSize' => $bl,
+                'recentLogins' => 0,
+                'recentChanges' => 0,
+            ],
+        ]);
+        return;
+    }
+    
     // Superuser and Superadmin see global stats unless specifically targeting an admin
     if ((isSuperuser($user) || isSuperAdmin($user)) && empty($_GET['admin_id'])) {
         $total = (int)$pdo->query("SELECT COUNT(*) FROM Users")->fetchColumn();
@@ -269,6 +311,50 @@ function change_logs() {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $rows = [];
+    }
+    jsonResp(['success' => true, 'data' => $rows]);
+}
+
+function top_sites() {
+    $user = requireAuth();
+    $pdo = db();
+    
+    try {
+        $st = $pdo->prepare("
+            SELECT 
+                SUBSTRING_INDEX(REPLACE(REPLACE(url, 'https://', ''), 'http://', ''), '/', 1) as domain,
+                COUNT(*) as visits
+            FROM BrowsingHistory
+            WHERE url NOT LIKE '%google.com%' AND url != '' AND url IS NOT NULL
+            GROUP BY domain
+            ORDER BY visits DESC
+            LIMIT 15
+        ");
+        $st->execute();
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $rows = [];
+    }
+    jsonResp(['success' => true, 'data' => $rows]);
+}
+
+function active_users() {
+    $user = requireAuth();
+    $pdo = db();
+    
+    try {
+        $st = $pdo->prepare("
+            SELECT u.username, COUNT(bh.id) as activityCount
+            FROM BrowsingHistory bh
+            JOIN Users u ON bh.user_id = u.id
+            GROUP BY bh.user_id, u.username
+            ORDER BY activityCount DESC
+            LIMIT 10
+        ");
+        $st->execute();
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
         $rows = [];
     }

@@ -1,10 +1,10 @@
 import React from 'react';
 import { Clock, User, Monitor } from 'lucide-react';
-import { useDashboardLogs } from '@/hooks/useDashboardData';
+import { useSystemLogs } from '@/hooks/useDashboardData';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function DashboardLogsTable() {
-  const { data: logs, isLoading, error } = useDashboardLogs(100);
+  const { data: logs, isLoading, error } = useSystemLogs();
 
   if (error) {
     return (

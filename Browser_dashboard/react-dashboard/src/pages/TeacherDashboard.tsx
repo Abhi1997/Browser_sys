@@ -4,6 +4,8 @@ import { DashboardStatsCards } from '@/components/shared/DashboardStatsCards';
 import { StudentDetailCard } from '@/components/admin/StudentDetailCard';
 import { WarningTriggersTable } from '@/components/admin/WarningTriggersTable';
 import { CachedSitesTable } from '@/components/admin/CachedSitesTable';
+import { TopVisitedChart } from '@/components/charts/TopVisitedChart';
+import { ActiveUsersChart } from '@/components/charts/ActiveUsersChart';
 import { Badge } from '@/components/ui/badge';
 import { useStudents } from '@/hooks/useDashboardData';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,6 +24,11 @@ export default function TeacherDashboard() {
       {/* Stats: Total Students, Total Whitelist, Total Blacklist */}
       <div className="mb-8">
         <DashboardStatsCards />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <TopVisitedChart />
+        <ActiveUsersChart />
       </div>
 
       {/* Violations & warning triggers (recorded with escalation) */}

@@ -628,7 +628,16 @@ class GmailLoginWindow(QDialog):
         if saved_fingerprint and user_id:
             try:
                 current_fingerprint = self.auth.get_device_info()["device_fingerprint"]
-                if saved_fingerprint == current_fingerprint:
+                login_timestamp = settings.value("login_timestamp", None)
+                import time
+                expired = False
+                if login_timestamp:
+                    try:
+                        if time.time() - float(login_timestamp) > 4 * 3600:
+                            expired = True
+                    except:
+                        pass
+                if saved_fingerprint == current_fingerprint and not expired:
                     # Valid device session
                     self.login_successful = True
                     self.user_role = settings.value("user_role")
@@ -639,12 +648,20 @@ class GmailLoginWindow(QDialog):
                     # Accept the dialog immediately in the event loop
                     QTimer.singleShot(0, self.accept)
                 else:
-                    # Invalid/copied session, wipe it
+                    # Invalid/copied or expired session, wipe it
                     settings.remove("device_fingerprint")
                     settings.remove("user_id")
                     settings.remove("user_role")
                     settings.remove("username")
                     settings.remove("gmail")
+                    settings.remove("login_timestamp")
+                    try:
+                        from PyQt6.QtWebEngineCore import QWebEngineProfile
+                        profile = QWebEngineProfile.defaultProfile()
+                        profile.cookieStore().deleteAllCookies()
+                        profile.clearAllVisitedLinks()
+                    except:
+                        pass
             except Exception:
                 pass
     
@@ -686,6 +703,8 @@ class GmailLoginWindow(QDialog):
             settings.setValue("user_id", user_id)
             settings.setValue("gmail", gmail)
             settings.setValue("device_fingerprint", device_info["device_fingerprint"])
+            import time
+            settings.setValue("login_timestamp", time.time())
             
         except Exception as e:
             # Log but don't fail login if device registration fails
@@ -844,6 +863,8 @@ class GmailLoginWindow(QDialog):
             settings.setValue("user_id", user_id)
             settings.setValue("gmail", getattr(self, "gmail", None))
             settings.setValue("device_fingerprint", device_info["device_fingerprint"])
+            import time
+            settings.setValue("login_timestamp", time.time())
             
             QMessageBox.information(self, "Login Successful", 
                                   f"Welcome, {username}! Role: {role}")

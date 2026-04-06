@@ -11,6 +11,8 @@ import { DashboardLogsTable } from '@/components/admin/DashboardLogsTable';
 import { WarningTriggersTable } from '@/components/admin/WarningTriggersTable';
 import { SessionUsageTable } from '@/components/admin/SessionUsageTable';
 import { ExportButton } from '@/components/admin/ExportButton';
+import { TopVisitedChart } from '@/components/charts/TopVisitedChart';
+import { ActiveUsersChart } from '@/components/charts/ActiveUsersChart';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,6 +42,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
 
 export default function SuperuserDashboard() {
+  const [activeTab, setActiveTab] = React.useState("users");
   const { selectedAdminId } = useAuth();
   const { data: admins, isLoading: adminsLoading } = useAdmins();
   const { data: users } = useUsers();
@@ -117,11 +120,16 @@ export default function SuperuserDashboard() {
 
       {/* Stats */}
       <div className="mb-8">
-        <DashboardStatsCards />
+        <DashboardStatsCards onTabChange={setActiveTab} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <TopVisitedChart />
+        <ActiveUsersChart />
       </div>
 
       {/* Tabs for all data management */}
-      <Tabs defaultValue="users" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="glass-card p-1 flex flex-wrap gap-1">
           <TabsTrigger value="users" className="data-[state=active]:bg-amber-600 data-[state=active]:text-white">
             All Users

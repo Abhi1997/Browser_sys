@@ -10,6 +10,9 @@ import { DashboardLogsTable } from '@/components/admin/DashboardLogsTable';
 import { WarningTriggersTable } from '@/components/admin/WarningTriggersTable';
 import { SessionUsageTable } from '@/components/admin/SessionUsageTable';
 import { CachedSitesTable } from '@/components/admin/CachedSitesTable';
+import { TopVisitedChart } from '@/components/charts/TopVisitedChart';
+import { ActiveUsersChart } from '@/components/charts/ActiveUsersChart';
+import { SystemLogsTree } from '@/components/admin/SystemLogsTree';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStudents, useUsers } from '@/hooks/useDashboardData';
@@ -17,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { GraduationCap } from 'lucide-react';
 
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = React.useState("students");
   const { data: students, isLoading: studentsLoading } = useStudents();
   const { data: users } = useUsers();
   const teachers = (users ?? []).filter((u: any) => u.role === 'teacher' || u.role === 'teacher');
@@ -32,11 +36,20 @@ export default function AdminDashboard() {
 
       {/* Stats: Total Students, Total Whitelist, Total Blacklist only */}
       <div className="mb-8">
-        <DashboardStatsCards />
+        <DashboardStatsCards onTabChange={setActiveTab} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <TopVisitedChart />
+        <ActiveUsersChart />
+      </div>
+      
+      <div className="mb-8">
+        <SystemLogsTree />
       </div>
 
       {/* Tabs: Users, Students (per-student cards), Teachers, Whitelist, Blacklist, Change logs */}
-      <Tabs defaultValue="students" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="glass-card p-1 flex flex-wrap gap-1">
           <TabsTrigger value="students" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             Students

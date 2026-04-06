@@ -200,8 +200,16 @@ export async function getChangeLogs(limit: number = 100): Promise<ApiResponse<im
   return apiRequest(`/api/change-logs?limit=${limit}`);
 }
 
-export async function getDashboardLogs(limit: number = 100): Promise<ApiResponse<any[]>> {
-  return apiRequest(`/api/dashboard-logs?limit=${limit}`);
+export async function getSystemLogs(limit: number = 100): Promise<ApiResponse<any[]>> {
+  return apiRequest(`/api/logs/system?limit=${limit}`);
+}
+
+export async function getTopSites(): Promise<ApiResponse<any[]>> {
+  return apiRequest('/api/analytics/top-sites');
+}
+
+export async function getActiveUsers(): Promise<ApiResponse<any[]>> {
+  return apiRequest('/api/analytics/active-users');
 }
 
 /** Log that the user opened the dashboard (who, when). Called once when dashboard layout loads. */

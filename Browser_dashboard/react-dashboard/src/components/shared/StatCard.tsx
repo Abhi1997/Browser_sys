@@ -13,6 +13,7 @@ interface StatCardProps {
   iconColor?: string;
   className?: string;
   delay?: number;
+  onClick?: () => void;
 }
 
 export function StatCard({ 
@@ -22,12 +23,15 @@ export function StatCard({
   icon: Icon, 
   iconColor = 'text-primary',
   className,
-  delay = 0
+  delay = 0,
+  onClick
 }: StatCardProps) {
   return (
     <div 
+      onClick={onClick}
       className={cn(
         "stat-card animate-slide-up",
+        onClick && "cursor-pointer hover:bg-slate-50 transition-colors dark:hover:bg-slate-800",
         className
       )}
       style={{ animationDelay: `${delay}ms` }}

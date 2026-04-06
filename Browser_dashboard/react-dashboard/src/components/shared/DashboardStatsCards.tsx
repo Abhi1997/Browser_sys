@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
  * Dashboard stats: Total Students, Total Whitelist, Total Blacklist only.
  * Data from database via API.
  */
-export function DashboardStatsCards() {
+export function DashboardStatsCards({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { data: stats, isLoading, error } = useStats();
 
   if (error) {
@@ -43,6 +43,7 @@ export function DashboardStatsCards() {
         icon={Users}
         iconColor="text-primary"
         delay={0}
+        onClick={() => onTabChange?.('students')}
       />
       <StatCard
         title="Total Whitelist"
@@ -50,6 +51,7 @@ export function DashboardStatsCards() {
         icon={ShieldCheck}
         iconColor="text-success"
         delay={100}
+        onClick={() => onTabChange?.('whitelist')}
       />
       <StatCard
         title="Total Blacklist"
@@ -57,6 +59,7 @@ export function DashboardStatsCards() {
         icon={ShieldAlert}
         iconColor="text-destructive"
         delay={200}
+        onClick={() => onTabChange?.('blacklist')}
       />
     </div>
   );

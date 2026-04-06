@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatRole, getRoleBadgeClass } from '@/lib/auth';
 import { logDashboardOpen } from '@/lib/api';
-import { Bell, LogOut, User, Shield, History } from 'lucide-react';
+import { LogOut, User, Shield, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AdminSwitcher } from '@/components/super/AdminSwitcher';
 import { DashboardSwitcher } from '@/components/super/DashboardSwitcher';
-import { NotificationsPanel } from '@/components/shared/NotificationsPanel';
+
 import { SettingsMenu } from '@/components/shared/SettingsMenu';
 
 interface DashboardLayoutProps {
@@ -25,7 +25,7 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, title }: DashboardLayoutProps) {
   const { user, role, logout } = useAuth();
-  const [showNotifications, setShowNotifications] = React.useState(false);
+
   const hasLoggedOpen = useRef(false);
 
   // Log dashboard open (who, when) to DB for dashboard logs tab
@@ -68,18 +68,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
             {/* Accessibility & Theme Settings */}
             <SettingsMenu />
 
-            {/* Notifications */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
-              onClick={() => setShowNotifications(!showNotifications)}
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium flex items-center justify-center text-destructive-foreground">
-                3
-              </span>
-            </Button>
+
 
             {/* User Menu */}
             <DropdownMenu>
@@ -129,11 +118,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
         </div>
       </main>
 
-      {/* Notifications Panel */}
-      <NotificationsPanel 
-        isOpen={showNotifications} 
-        onClose={() => setShowNotifications(false)} 
-      />
+
     </div>
   );
 }

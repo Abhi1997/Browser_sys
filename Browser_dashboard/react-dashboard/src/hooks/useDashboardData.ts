@@ -11,7 +11,9 @@ import {
   getCachedSites,
   deleteCachedSite,
   getChangeLogs,
-  getDashboardLogs,
+  getSystemLogs,
+  getTopSites,
+  getActiveUsers,
   getHistory,
   getStudentHistory,
   getBookmarks,
@@ -65,7 +67,7 @@ export function useStats() {
       }
       return response.data!;
     },
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 300000, // Refetch every 30 seconds
     retry: 2, // Retry failed requests twice
   });
 }
@@ -85,7 +87,7 @@ export function useUsers() {
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     retry: 2,
   });
 }
@@ -105,7 +107,7 @@ export function useStudents() {
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     retry: 2,
   });
 }
@@ -122,7 +124,7 @@ export function useActivity(studentId?: string, limit: number = 100) {
       }
       return response.data!;
     },
-    refetchInterval: 10000, // Refetch every 10 seconds for activity
+    refetchInterval: 600000, // Refetch every 10 seconds for activity
     retry: 2,
   });
 }
@@ -139,7 +141,7 @@ export function useViolations(studentId?: string, limit: number = 100) {
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     retry: 2,
   });
 }
@@ -156,24 +158,58 @@ export function useChangeLogs(limit: number = 100) {
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     retry: 2,
   });
 }
 
 // Dashboard logs query (who opened dashboard when - admin only)
-export function useDashboardLogs(limit: number = 100) {
+export function useSystemLogs(limit: number = 100) {
   return useQuery({
-    queryKey: ['dashboardLogs', limit],
+    queryKey: ['systemLogs', limit],
     queryFn: async () => {
-      const response = await getDashboardLogs(limit);
+      const response = await getSystemLogs(limit);
       if (!response.success) {
-        console.warn('Failed to fetch dashboard logs:', response.error);
+        console.warn('Failed to fetch system logs:', response.error);
         return [];
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
+    retry: 2,
+  });
+}
+
+// Top sites global graph data
+export function useTopSites() {
+  return useQuery({
+    queryKey: ['topSites'],
+    queryFn: async () => {
+      const response = await getTopSites();
+      if (!response.success) {
+        console.warn('Failed to fetch top sites:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 600000,
+    retry: 2,
+  });
+}
+
+// Active users global graph data
+export function useActiveUsers() {
+  return useQuery({
+    queryKey: ['activeUsers'],
+    queryFn: async () => {
+      const response = await getActiveUsers();
+      if (!response.success) {
+        console.warn('Failed to fetch active users:', response.error);
+        return [];
+      }
+      return response.data!;
+    },
+    refetchInterval: 600000,
     retry: 2,
   });
 }
@@ -190,7 +226,7 @@ export function useHistory(limit: number = 100) {
       }
       return response.data!;
     },
-    refetchInterval: 60000,
+    refetchInterval: 600000,
     retry: 2,
   });
 }
@@ -209,7 +245,7 @@ export function useStudentHistory(studentId: string | undefined, limit: number =
       return response.data!;
     },
     enabled: !!studentId,
-    refetchInterval: 60000,
+    refetchInterval: 600000,
     retry: 2,
   });
 }
@@ -226,7 +262,7 @@ export function useBookmarks() {
       }
       return response.data!;
     },
-    refetchInterval: 60000,
+    refetchInterval: 600000,
     retry: 2,
   });
 }
@@ -245,7 +281,7 @@ export function useStudentBookmarks(studentId: string | undefined) {
       return response.data!;
     },
     enabled: !!studentId,
-    refetchInterval: 60000,
+    refetchInterval: 600000,
     retry: 2,
   });
 }
@@ -262,7 +298,7 @@ export function useWarningTriggers(limit: number = 100, studentId?: string) {
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     retry: 2,
   });
 }
@@ -279,7 +315,7 @@ export function useCachedSites() {
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     retry: 2,
   });
 }
@@ -310,7 +346,7 @@ export function useSessions(limit: number = 100) {
       }
       return response.data!;
     },
-    refetchInterval: 60000,
+    refetchInterval: 600000,
     retry: 2,
   });
 }
@@ -327,7 +363,7 @@ export function useAdmins() {
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     retry: 2,
   });
 }
@@ -344,7 +380,7 @@ export function useTeachers() {
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     retry: 2,
   });
 }
@@ -514,7 +550,7 @@ export function useWhitelist() {
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     retry: 2,
   });
 }
@@ -619,7 +655,7 @@ export function useBlacklist() {
       }
       return response.data!;
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     retry: 2,
   });
 }

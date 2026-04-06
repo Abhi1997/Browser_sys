@@ -38,6 +38,9 @@ $pathAliases = [
     'teachers' => 'api/teachers',
     'admins' => 'api/admins',
     'bookmarks' => 'api/bookmarks',
+    'logs/system' => 'api/dashboard-logs',
+    'analytics/top-sites' => 'api/analytics/top-sites',
+    'analytics/active-users' => 'api/analytics/active-users',
 ];
 if (isset($pathAliases[$path])) {
     $path = $pathAliases[$path];
@@ -82,6 +85,9 @@ $routes = [
         'api/admins' => ['admins_list', 'users'],
         'api/teachers' => ['teachers_list', 'users'],
         'api/bookmarks' => ['bookmarks_list', 'bookmarks'],
+        'api/logs/system' => ['dashboard_logs', 'stats'],
+        'api/analytics/top-sites' => ['top_sites', 'stats'],
+        'api/analytics/active-users' => ['active_users', 'stats'],
         'notifications' => ['notifications_list', 'notifications'],
         'health' => ['health', 'stats'],
         'api/debug' => ['debug', 'stats'],

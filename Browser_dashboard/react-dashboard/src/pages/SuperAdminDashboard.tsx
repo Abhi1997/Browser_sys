@@ -4,6 +4,9 @@ import { DashboardStatsCards } from '@/components/shared/DashboardStatsCards';
 import { AdminSwitcher } from '@/components/super/AdminSwitcher';
 import { UserTable } from '@/components/admin/UserTable';
 import { ListTable } from '@/components/admin/ListTable';
+import { TopVisitedChart } from '@/components/charts/TopVisitedChart';
+import { ActiveUsersChart } from '@/components/charts/ActiveUsersChart';
+import { SystemLogsTree } from '@/components/admin/SystemLogsTree';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -99,6 +102,15 @@ export default function SuperAdminDashboard() {
       {/* Stats: Total Students, Whitelist, Blacklist */}
       <div className="mb-8">
         <DashboardStatsCards />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <TopVisitedChart />
+        <ActiveUsersChart />
+      </div>
+      
+      <div className="mb-8">
+        <SystemLogsTree />
       </div>
 
       {selectedAdminId && selectedAdminId !== 'system' && selectedAdmin ? (

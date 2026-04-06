@@ -17,7 +17,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(
-    () => (localStorage.getItem('ui-theme') as Theme) || 'system'
+    () => (localStorage.getItem('ui-theme') as Theme) || 'light'
   );
   const [contrast, setContrastState] = useState<Contrast>(
     () => (localStorage.getItem('ui-contrast') as Contrast) || 'normal'
