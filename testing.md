@@ -27,7 +27,7 @@
 
 ## 1. Test Environment Setup
 
-### 1.1 Prerequisites
+ 1.1 Prerequisites
 
 | Component | Requirement |
 |---|---|
@@ -37,7 +37,7 @@
 | Browser | Chrome/Firefox for dashboard manual testing |
 | OS | macOS (primary), Windows/Linux (cross-platform) |
 
-### 1.2 Setting Up Local Testing
+ 1.2 Setting Up Local Testing
 
 ```bash
 # 1. Start the React dashboard dev server
@@ -59,7 +59,7 @@ python tests/test_dashboard_window.py      # Interactive login
 python tests/test_management_window.py     # Management panel
 ```
 
-### 1.3 Test User Credentials
+ 1.3 Test User Credentials
 
 | Username | Password | Role | Purpose |
 |---|---|---|---|
@@ -73,7 +73,7 @@ python tests/test_management_window.py     # Management panel
 
 ## 2. Unit Testing
 
-### 2.1 Authentication Module (`qtapp/authentication.py`)
+ 2.1 Authentication Module (`qtapp/authentication.py`)
 
 | # | Test Case | Steps | Expected Result | Status |
 |---|---|---|---|---|
@@ -88,7 +88,7 @@ python tests/test_management_window.py     # Management panel
 | U-09 | Teacher approval gate | Login as unapproved teacher | Returns `None` (blocked) | |
 | U-10 | Device registration | Call `register_device(user_id, device_info)` | Returns `True`, device stored in DB | |
 
-### 2.2 Mode Enforcement (`qtapp/mode_enforcement.py`)
+ 2.2 Mode Enforcement (`qtapp/mode_enforcement.py`)
 
 | # | Test Case | Steps | Expected Result | Status |
 |---|---|---|---|---|
@@ -101,7 +101,7 @@ python tests/test_management_window.py     # Management panel
 | U-17 | Free mode: Safe Browsing | Visit a known malicious URL | Blocked by Google Safe Browsing check | |
 | U-18 | Mode change reflects | Admin changes student from restricted→free | Student's next session uses free mode | |
 
-### 2.3 Student Profile Management
+ 2.3 Student Profile Management
 
 | # | Test Case | Steps | Expected Result | Status |
 |---|---|---|---|---|
@@ -113,7 +113,7 @@ python tests/test_management_window.py     # Management panel
 
 ## 3. Integration Testing
 
-### 3.1 Authentication → Dashboard Flow
+ 3.1 Authentication → Dashboard Flow
 
 | # | Test Case | Steps | Expected Result | Status |
 |---|---|---|---|---|
@@ -123,7 +123,7 @@ python tests/test_management_window.py     # Management panel
 | I-04 | Session persistence | Login, close app, reopen within 4 hours | Session restored from QSettings, no re-login needed | |
 | I-05 | Session expiry | Login, wait 4+ hours (or mock time) | Session expired, cookies cleared, login required | |
 
-### 3.2 Dashboard → API → Database Flow
+ 3.2 Dashboard → API → Database Flow
 
 | # | Test Case | Steps | Expected Result | Status |
 |---|---|---|---|---|
@@ -133,7 +133,7 @@ python tests/test_management_window.py     # Management panel
 | I-09 | Whitelist CRUD | Add → Edit → Delete whitelist entry from dashboard | Changes reflected in `WhitelistDomains` table | |
 | I-10 | Blacklist CRUD | Add → Edit → Delete blacklist entry from dashboard | Changes reflected in `BlacklistDomains` table | |
 
-### 3.3 Browser → Database Logging
+ 3.3 Browser → Database Logging
 
 | # | Test Case | Steps | Expected Result | Status |
 |---|---|---|---|---|
@@ -147,7 +147,7 @@ python tests/test_management_window.py     # Management panel
 
 ## 4. Functional Testing (Feature-by-Feature)
 
-### 4.1 Browser Application (PyQt6)
+ 4.1 Browser Application (PyQt6)
 
 | # | Feature | Test Steps | Expected Result | Status |
 |---|---|---|---|---|
@@ -162,7 +162,7 @@ python tests/test_management_window.py     # Management panel
 | F-09 | Dashboard button | Click "Dashboard" | Dashboard window opens with correct role view | |
 | F-10 | Management button | Login as admin, click "Management Panel" | Management window opens | |
 
-### 4.2 Login Window
+ 4.2 Login Window
 
 | # | Feature | Test Steps | Expected Result | Status |
 |---|---|---|---|---|
@@ -174,7 +174,7 @@ python tests/test_management_window.py     # Management panel
 | F-16 | Session remember | Login, close, reopen within 4h | Auto-login without prompt | |
 | F-17 | Session expire | Wait 4+ hours | Must re-login, cookies cleared | |
 
-### 4.3 Dashboard (React)
+ 4.3 Dashboard (React)
 
 | # | Feature | Test Steps | Expected Result | Status |
 |---|---|---|---|---|
@@ -195,7 +195,7 @@ python tests/test_management_window.py     # Management panel
 | F-32 | My profile page | Click user menu → My Profile | Shows user info | |
 | F-33 | My history page | Click user menu → My History | Shows personal browsing history | |
 
-### 4.4 Caching System (Offline Mode)
+ 4.4 Caching System (Offline Mode)
 
 | # | Feature | Test Steps | Expected Result | Status |
 |---|---|---|---|---|
@@ -208,7 +208,7 @@ python tests/test_management_window.py     # Management panel
 
 ## 5. Role-Based Access Control Testing
 
-### 5.1 Data Isolation Matrix
+ 5.1 Data Isolation Matrix
 
 Test that each role sees ONLY its permitted data:
 
@@ -224,7 +224,7 @@ Test that each role sees ONLY its permitted data:
 | `DELETE /api/users/:id` | ❌ | ❌ | ✅ Own group | ❌ | ✅ |
 | `POST /api/students/:id/mode` | ❌ | ✅ Own students | ✅ Own group | ❌ (read-only) | ✅ |
 
-### 5.2 Specific RBAC Test Cases
+ 5.2 Specific RBAC Test Cases
 
 | # | Test Case | Steps | Expected | Status |
 |---|---|---|---|---|
@@ -245,7 +245,7 @@ Test that each role sees ONLY its permitted data:
 
 Use Postman or curl. See `docs/POSTMAN_GUIDE.md` for collection setup.
 
-### 6.1 Authentication Endpoints
+ 6.1 Authentication Endpoints
 
 | # | Method | Endpoint | Test | Expected | Status |
 |---|---|---|---|---|---|
@@ -257,7 +257,7 @@ Use Postman or curl. See `docs/POSTMAN_GUIDE.md` for collection setup.
 | A-06 | `POST` | `/api/auth/reset-password` | Valid reset token | 200 + success | |
 | A-07 | `POST` | `/api/auth/dashboard-log-open` | With auth header | 200 + logged | |
 
-### 6.2 CRUD Endpoints
+ 6.2 CRUD Endpoints
 
 | # | Method | Endpoint | Test | Expected | Status |
 |---|---|---|---|---|---|
@@ -293,7 +293,7 @@ Use Postman or curl. See `docs/POSTMAN_GUIDE.md` for collection setup.
 | A-37 | `GET` | `/health` | No auth needed | 200 + status:ok | |
 | A-38 | `GET` | `/api/bookmarks` | With auth | 200 + user bookmarks | |
 
-### 6.3 Error Handling
+ 6.3 Error Handling
 
 | # | Test Case | Steps | Expected | Status |
 |---|---|---|---|---|
@@ -304,7 +304,7 @@ Use Postman or curl. See `docs/POSTMAN_GUIDE.md` for collection setup.
 
 ---
 
-## 7. Security Testing
+ 7. Security Testing
 
 | # | Test Case | Steps | Expected | Status |
 |---|---|---|---|---|
@@ -321,9 +321,9 @@ Use Postman or curl. See `docs/POSTMAN_GUIDE.md` for collection setup.
 
 ---
 
-## 8. UI/UX Testing
+ 8. UI/UX Testing
 
-### 8.1 Dashboard UI
+ 8.1 Dashboard UI
 
 | # | Test Case | Steps | Expected | Status |
 |---|---|---|---|---|
@@ -338,7 +338,7 @@ Use Postman or curl. See `docs/POSTMAN_GUIDE.md` for collection setup.
 | UI-09 | User menu | Click avatar in header | Dropdown with Profile, History, Sign Out | |
 | UI-10 | Admin switcher | Login as superadmin, use admin switcher | Dashboard data changes to selected admin's scope | |
 
-### 8.2 Browser UI
+ 8.2 Browser UI
 
 | # | Test Case | Steps | Expected | Status |
 |---|---|---|---|---|
@@ -349,7 +349,7 @@ Use Postman or curl. See `docs/POSTMAN_GUIDE.md` for collection setup.
 
 ---
 
-## 9. Performance Testing
+ 9. Performance Testing
 
 | # | Test Case | Steps | Expected | Status |
 |---|---|---|---|---|
@@ -363,7 +363,7 @@ Use Postman or curl. See `docs/POSTMAN_GUIDE.md` for collection setup.
 
 ---
 
-## 10. Compatibility Testing
+ 10. Compatibility Testing
 
 | # | Test Case | Platform | Expected | Status |
 |---|---|---|---|---|
@@ -377,7 +377,7 @@ Use Postman or curl. See `docs/POSTMAN_GUIDE.md` for collection setup.
 
 ---
 
-## 11. Regression Testing
+ 11. Regression Testing
 
 After any code change, verify these critical paths still work:
 
@@ -392,13 +392,13 @@ After any code change, verify these critical paths still work:
 
 ---
 
-## 12. User Acceptance Testing (UAT)
+ 12. User Acceptance Testing (UAT)
 
-### 12.1 Scenario-Based Tests
+ 12.1 Scenario-Based Tests
 
 These simulate real-world usage for the FYP demo:
 
-#### Scenario 1: Teacher's Daily Workflow
+# Scenario 1: Teacher's Daily Workflow
 1. Teacher logs in with username/password
 2. Dashboard opens showing **only their assigned students**
 3. Teacher views student violations — sees only their students' violations
@@ -407,7 +407,7 @@ These simulate real-world usage for the FYP demo:
 6. Teacher views student browsing history
 7. **Pass criteria:** All data is teacher-scoped, mode change reflects immediately
 
-#### Scenario 2: Admin Sets Up a Class
+# Scenario 2: Admin Sets Up a Class
 1. Admin logs in
 2. Creates 2 teacher accounts from dashboard
 3. Creates 5 student accounts
@@ -417,7 +417,7 @@ These simulate real-world usage for the FYP demo:
 7. Sets students to "study" mode
 8. **Pass criteria:** Teachers see only their assigned students; whitelist/blacklist enforced
 
-#### Scenario 3: Student Exam Mode
+# Scenario 3: Student Exam Mode
 1. Admin sets student to "cached" mode
 2. Teacher caches exam pages beforehand
 3. Student logs in — sees cached mode indicator
@@ -426,7 +426,7 @@ These simulate real-world usage for the FYP demo:
 6. Violation logged automatically
 7. **Pass criteria:** Complete network isolation, only cached content accessible
 
-#### Scenario 4: Superadmin Oversight
+# Scenario 4: Superadmin Oversight
 1. Superadmin logs in
 2. Sees global statistics across all admins
 3. Uses admin switcher to view specific admin's group data
@@ -434,7 +434,7 @@ These simulate real-world usage for the FYP demo:
 5. Creates a new admin account
 6. **Pass criteria:** Full visibility, creation works, modification blocked
 
-#### Scenario 5: Superuser Full Control
+# Scenario 5: Superuser Full Control
 1. Superuser logs in
 2. Sees all data across all groups
 3. Can modify any user, whitelist, blacklist
@@ -442,7 +442,7 @@ These simulate real-world usage for the FYP demo:
 5. Can delete any user
 6. **Pass criteria:** No restrictions, full CRUD on everything
 
-#### Scenario 6: Session & Security
+# Scenario 6: Session & Security
 1. User logs in, note the time
 2. Close the application
 3. Reopen within 4 hours — auto-login works
@@ -450,7 +450,7 @@ These simulate real-world usage for the FYP demo:
 5. After re-login, site cookies (YouTube, Google) are cleared
 6. **Pass criteria:** Session persistence and expiry work correctly
 
-### 12.2 UAT Sign-Off Checklist
+ 12.2 UAT Sign-Off Checklist
 
 | Category | Verified By | Date | Signature |
 |---|---|---|---|
@@ -464,76 +464,7 @@ These simulate real-world usage for the FYP demo:
 | Session Management | | | |
 | Export & Reporting | | | |
 
----
 
-## 13. Test Summary Report Template
-
-Use this template for the final FYP test report:
-
-```
-============================================================
-TEST SUMMARY REPORT
-Project: Secure Academic Browser (EduBrowser)
-Date: ___________
-Tester: ___________
-============================================================
-
-ENVIRONMENT
------------
-OS: macOS _____ / Windows _____ / Linux _____
-Python: _____
-Node.js: _____
-Database: MySQL 8.x (Hostinger)
-API: https://api.abhinavpaudel.com
-Dashboard: https://abhinavpaudel.com
-
-RESULTS SUMMARY
----------------
-Total Test Cases:    _____
-Passed:              _____
-Failed:              _____
-Blocked:             _____
-Not Executed:        _____
-Pass Rate:           _____% 
-
-CATEGORY BREAKDOWN
-------------------
-Unit Tests:          _____ / 21 passed
-Integration Tests:   _____ / 15 passed
-Functional Tests:    _____ / 37 passed
-RBAC Tests:          _____ / 10 passed
-API Tests:           _____ / 42 passed
-Security Tests:      _____ / 10 passed
-UI/UX Tests:         _____ / 14 passed
-Performance Tests:   _____ / 7  passed
-Compatibility Tests: _____ / 7  passed
-Regression Tests:    _____ / 6  passed
-UAT Scenarios:       _____ / 6  passed
-
-DEFECTS FOUND
--------------
-Critical: _____
-High:     _____
-Medium:   _____
-Low:      _____
-
-KNOWN ISSUES
-------------
-1. ___________
-2. ___________
-
-CONCLUSION
-----------
-[Overall assessment and recommendation for submission]
-
-SIGN-OFF
---------
-Tester:    _____________  Date: __________
-Supervisor: ____________  Date: __________
-============================================================
-```
-
----
 
 ## Quick Reference: Running All Tests
 
