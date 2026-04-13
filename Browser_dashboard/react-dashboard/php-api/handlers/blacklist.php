@@ -34,9 +34,8 @@ function blacklist_add() {
     $userId = $user['userId'] ?? $user['user_id'] ?? null;
     $adminId = getUserAdminId($user);
     $url = $data['url'] ?? '';
+    // Strip HTTP prefixes but preserve URL paths for substring filtering
     $domain = preg_replace('#^https?://#', '', $url);
-    $domain = explode('/', $domain)[0];
-    $domain = explode('?', $domain)[0];
 
     $pdo = db();
     $st = $pdo->prepare("
@@ -76,8 +75,6 @@ function blacklist_update($id) {
     if (array_key_exists('url', $data) || array_key_exists('domain', $data)) {
         $url = $data['url'] ?? $data['domain'] ?? '';
         $domain = preg_replace('#^https?://#', '', $url);
-        $domain = explode('/', $domain)[0];
-        $domain = explode('?', $domain)[0];
         $up[] = 'domain = ?';
         $vals[] = $domain;
     }

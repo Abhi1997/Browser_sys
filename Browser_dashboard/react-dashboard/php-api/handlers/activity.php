@@ -47,8 +47,6 @@ function activity_list() {
         $whereSql = 'WHERE ' . implode(' AND ', $whereClauses);
     }
 
-    $params[] = $limit;
-
     try {
         $st = $pdo->prepare("
             SELECT al.id, al.student_id as studentId, al.user_id, al.url, al.visit_start as visitStart,
@@ -57,7 +55,7 @@ function activity_list() {
             $joinClause
             $whereSql
             ORDER BY al.visit_start DESC, al.created_at DESC
-            LIMIT ?
+            LIMIT {$limit}
         ");
         $st->execute($params);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);

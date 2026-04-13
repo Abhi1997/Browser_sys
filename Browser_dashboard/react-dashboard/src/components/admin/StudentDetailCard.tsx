@@ -42,6 +42,7 @@ interface StudentDetailCardProps {
     is_active?: boolean;
     teacher_id?: string | number;
     teacherName?: string;
+    deviceToken?: string;
   };
 }
 
@@ -112,6 +113,18 @@ export function StudentDetailCard({ student }: StudentDetailCardProps) {
               <Badge variant="secondary" className="shrink-0">
                 Teacher: {student.teacherName}
               </Badge>
+            )}
+            {student.deviceToken && (
+              <div 
+                className="shrink-0 flex items-center gap-1 bg-muted/60 text-[10px] px-2 py-0.5 rounded cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors border"
+                title="Copy full Device Token to clipboard"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(student.deviceToken!);
+                }}
+              >
+                ID: {student.deviceToken.substring(0, 8)}...
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap" onClick={(e) => e.stopPropagation()}>

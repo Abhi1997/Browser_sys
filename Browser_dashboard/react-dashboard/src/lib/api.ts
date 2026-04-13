@@ -200,8 +200,10 @@ export async function getChangeLogs(limit: number = 100): Promise<ApiResponse<im
   return apiRequest(`/api/change-logs?limit=${limit}`);
 }
 
-export async function getSystemLogs(limit: number = 100): Promise<ApiResponse<any[]>> {
-  return apiRequest(`/api/logs/system?limit=${limit}`);
+export async function getSystemLogs(limit: number = 100, role?: string): Promise<ApiResponse<any[]>> {
+  const q = new URLSearchParams({ limit: String(limit) });
+  if (role) q.set('role', role);
+  return apiRequest(`/api/logs/system?${q.toString()}`);
 }
 
 export async function getTopSites(): Promise<ApiResponse<any[]>> {

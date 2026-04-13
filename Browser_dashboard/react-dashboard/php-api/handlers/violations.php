@@ -38,16 +38,30 @@ function violations_list() {
     }
 
     if ($studentId !== '') {
-        $whereClauses[] = 'v.student_id = ?';
-        $params[] = $studentId;
+        // Resolve studentId: it may be a username (student_id) or numeric user_id.
+        // Match on both v.student_id and v.user_id for robustness.
+        $resolvedUserId = null;
+        if (!is_numeric($studentId)) {
+            $res = $pdo->prepare("SELECT user_id FROM Students WHERE student_id = ?");
+            $res->execute([$studentId]);
+            $row = $res->fetch(PDO::FETCH_ASSOC);
+            $resolvedUserId = $row['user_id'] ?? null;
+        }
+        if ($resolvedUserId) {
+            $whereClauses[] = '(v.student_id = ? OR v.user_id = ?)';
+            $params[] = $studentId;
+            $params[] = $resolvedUserId;
+        } else {
+            $whereClauses[] = '(v.student_id = ? OR v.user_id = ?)';
+            $params[] = $studentId;
+            $params[] = $studentId;
+        }
     }
 
     $whereSql = '';
     if ($whereClauses) {
         $whereSql = 'WHERE ' . implode(' AND ', $whereClauses);
     }
-
-    $params[] = $limit;
 
     try {
         $st = $pdo->prepare("
@@ -58,7 +72,7 @@ function violations_list() {
             $joinClause
             $whereSql
             ORDER BY v.created_at DESC
-            LIMIT ?
+            LIMIT {$limit}
         ");
         $st->execute($params);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);

@@ -34,9 +34,8 @@ function whitelist_add() {
     $userId = $user['userId'] ?? $user['user_id'] ?? null;
     $adminId = getUserAdminId($user);
     $url = $data['url'] ?? '';
+    // Strip only HTTP protocols, preserving paths securely for the new substring logic
     $domain = preg_replace('#^https?://#', '', $url);
-    $domain = explode('/', $domain)[0];
-    $domain = explode('?', $domain)[0];
 
     $pdo = db();
     $st = $pdo->prepare("
@@ -76,8 +75,6 @@ function whitelist_update($id) {
     if (array_key_exists('url', $data) || array_key_exists('domain', $data)) {
         $url = $data['url'] ?? $data['domain'] ?? '';
         $domain = preg_replace('#^https?://#', '', $url);
-        $domain = explode('/', $domain)[0];
-        $domain = explode('?', $domain)[0];
         $up[] = 'domain = ?';
         $vals[] = $domain;
     }

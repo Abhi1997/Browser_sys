@@ -1,26 +1,26 @@
 import React from 'react';
 import { DashboardLayout } from '@/components/layouts/DashboardLayout';
 import { DashboardStatsCards } from '@/components/shared/DashboardStatsCards';
-import { UserTable } from '@/components/admin/UserTable';
+
 import { StudentDetailCard } from '@/components/admin/StudentDetailCard';
 import { ListTable } from '@/components/admin/ListTable';
 import { ExportButton } from '@/components/admin/ExportButton';
-import { ChangeLogsTable } from '@/components/admin/ChangeLogsTable';
 import { DashboardLogsTable } from '@/components/admin/DashboardLogsTable';
-import { WarningTriggersTable } from '@/components/admin/WarningTriggersTable';
-import { SessionUsageTable } from '@/components/admin/SessionUsageTable';
 import { CachedSitesTable } from '@/components/admin/CachedSitesTable';
 import { TopVisitedChart } from '@/components/charts/TopVisitedChart';
-import { ActiveUsersChart } from '@/components/charts/ActiveUsersChart';
+import { RecentLoginsCard } from '@/components/charts/RecentLoginsCard';
 import { SystemLogsTree } from '@/components/admin/SystemLogsTree';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStudents, useUsers } from '@/hooks/useDashboardData';
 import { Skeleton } from '@/components/ui/skeleton';
-import { GraduationCap } from 'lucide-react';
+import { GraduationCap, UserPlus } from 'lucide-react';
+import { AddUserModal } from '@/components/admin/AddUserModal';
+import { Button } from '@/components/ui/button';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = React.useState("students");
+  const [isAddUserOpen, setIsAddUserOpen] = React.useState(false);
   const { data: students, isLoading: studentsLoading } = useStudents();
   const { data: users } = useUsers();
   const teachers = (users ?? []).filter((u: any) => u.role === 'teacher' || u.role === 'teacher');
@@ -31,7 +31,13 @@ export default function AdminDashboard() {
         <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
           Full Access
         </Badge>
-        <ExportButton />
+        <div className="flex items-center gap-4">
+          <Button onClick={() => setIsAddUserOpen(true)} className="gap-2">
+            <UserPlus className="h-4 w-4" />
+            Add User
+          </Button>
+          <ExportButton />
+        </div>
       </div>
 
       {/* Stats: Total Students, Total Whitelist, Total Blacklist only */}
@@ -41,7 +47,7 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <TopVisitedChart />
-        <ActiveUsersChart />
+        <RecentLoginsCard />
       </div>
       
       <div className="mb-8">
@@ -57,9 +63,6 @@ export default function AdminDashboard() {
           <TabsTrigger value="teachers" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             Teachers
           </TabsTrigger>
-          <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            Users
-          </TabsTrigger>
           <TabsTrigger value="whitelist" className="data-[state=active]:bg-success data-[state=active]:text-success-foreground">
             Whitelist
           </TabsTrigger>
@@ -71,15 +74,6 @@ export default function AdminDashboard() {
           </TabsTrigger>
           <TabsTrigger value="dashboard-logs" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">
             Dashboard logs
-          </TabsTrigger>
-          <TabsTrigger value="logs" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            Change logs
-          </TabsTrigger>
-          <TabsTrigger value="warnings" className="data-[state=active]:bg-warning data-[state=active]:text-warning-foreground">
-            Warning triggers
-          </TabsTrigger>
-          <TabsTrigger value="sessions" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            Session usage
           </TabsTrigger>
         </TabsList>
 
@@ -129,10 +123,6 @@ export default function AdminDashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="users" className="animate-fade-in">
-          <UserTable />
-        </TabsContent>
-
         <TabsContent value="whitelist" className="animate-fade-in">
           <ListTable type="whitelist" />
         </TabsContent>
@@ -148,16 +138,8 @@ export default function AdminDashboard() {
         <TabsContent value="dashboard-logs" className="animate-fade-in">
           <DashboardLogsTable />
         </TabsContent>
-        <TabsContent value="logs" className="animate-fade-in">
-          <ChangeLogsTable />
-        </TabsContent>
-        <TabsContent value="warnings" className="animate-fade-in">
-          <WarningTriggersTable />
-        </TabsContent>
-        <TabsContent value="sessions" className="animate-fade-in">
-          <SessionUsageTable />
-        </TabsContent>
       </Tabs>
+      <AddUserModal isOpen={isAddUserOpen} onClose={() => setIsAddUserOpen(false)} />
     </DashboardLayout>
   );
 }

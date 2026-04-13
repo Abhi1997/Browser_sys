@@ -203,8 +203,8 @@ function sessions_list() {
     $pdo = db();
     
     list($adminClause, $adminParams) = adminIdFilter($user, 's');
-    $params = array_merge($adminParams, [$limit]);
-    
+    $params = $adminParams;
+
     try {
         $st = $pdo->prepare("
             SELECT s.id, s.user_id as userId, s.device_id as deviceId, s.created_at as sessionStart,
@@ -214,7 +214,7 @@ function sessions_list() {
             LEFT JOIN Users u ON s.user_id = u.id
             WHERE 1=1 $adminClause
             ORDER BY s.last_activity_at DESC, s.created_at DESC
-            LIMIT ?
+            LIMIT {$limit}
         ");
         $st->execute($params);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -267,24 +267,63 @@ function log_dashboard_open() {
 function dashboard_logs() {
     $user = requireAuth();
     $role = strtolower($user['role'] ?? '');
+    $filterRole = strtolower($_GET['role'] ?? '');
+    
     if (!in_array($role, ['admin', 'super-admin', 'superadmin', 'superuser'], true)) {
-        jsonResp(['success' => false, 'error' => 'Forbidden'], 403);
+        // Allow teachers ONLY if they are explicitly fetching student logs
+        if ($role !== 'teacher' || $filterRole !== 'student') {
+            jsonResp(['success' => false, 'error' => 'Forbidden'], 403);
+        }
     }
+    
     $limit = min(max((int)($_GET['limit'] ?? 100), 1), 500);
+    
     $pdo = db();
     try {
-        $st = $pdo->prepare("
-            SELECT d.id, d.user_id as userId, d.role, d.action, d.endpoint, d.ip_address as ipAddress, d.device_id as deviceId, d.created_at as createdAt,
-                   u.username
-            FROM DashboardLogs d
-            LEFT JOIN Users u ON d.user_id = u.id
-            ORDER BY d.created_at DESC
-            LIMIT ?
-        ");
-        $st->execute([$limit]);
-        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        if ($filterRole === 'student') {
+            $joinTeacher = '';
+            $whereTeacher = '';
+            $params = [];
+            
+            if ($role === 'teacher') {
+                $teacherId = getUserTeacherId($user);
+                $joinTeacher = 'JOIN Students st ON u.id = st.user_id';
+                $whereTeacher = 'AND st.teacher_id = :tid';
+            }
+            
+            $st = $pdo->prepare("
+                SELECT s.id, s.user_id as userId, u.role, 'Logged in to browser' as action, NULL as endpoint, NULL as ipAddress, s.device_id as deviceId, s.created_at as createdAt,
+                       u.username
+                FROM Sessions s
+                JOIN Users u ON s.user_id = u.id
+                $joinTeacher
+                WHERE u.role = 'student' $whereTeacher
+                ORDER BY s.created_at DESC
+                LIMIT :mylimit
+            ");
+            
+            if ($role === 'teacher') {
+                $st->bindValue(':tid', $teacherId, PDO::PARAM_INT);
+            }
+            $st->bindValue(':mylimit', (int)$limit, PDO::PARAM_INT);
+            $st->execute();
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $st = $pdo->prepare("
+                SELECT d.id, d.user_id as userId, d.role, d.action, d.endpoint, d.ip_address as ipAddress, d.device_id as deviceId, d.created_at as createdAt,
+                       u.username
+                FROM DashboardLogs d
+                LEFT JOIN Users u ON d.user_id = u.id
+                ORDER BY d.created_at DESC
+                LIMIT :mylimit
+            ");
+            $st->bindValue(':mylimit', (int)$limit, PDO::PARAM_INT);
+            $st->execute();
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        }
     } catch (Throwable $e) {
         $rows = [];
+        jsonResp(['success' => false, 'error' => $e->getMessage()]);
     }
     jsonResp(['success' => true, 'data' => $rows]);
 }
@@ -295,7 +334,7 @@ function change_logs() {
     $pdo = db();
     
     list($adminClause, $adminParams) = adminIdFilter($user, 'm');
-    $params = array_merge($adminParams, [$limit]);
+    $params = $adminParams;
     
     try {
         $sql = "
@@ -306,7 +345,7 @@ function change_logs() {
             LEFT JOIN Users u ON m.changed_by = u.id
             WHERE 1=1 $adminClause
             ORDER BY m.changed_at DESC
-            LIMIT ?
+            LIMIT {$limit}
         ";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);

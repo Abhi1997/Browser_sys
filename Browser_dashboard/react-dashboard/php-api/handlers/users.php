@@ -394,6 +394,11 @@ function teachers_list() {
     $user = requireAuth();
     $role = strtolower($user['role'] ?? '');
     
+    if ($role === 'teacher') {
+        jsonResp(['success' => true, 'data' => []]);
+        return;
+    }
+    
     if ($role !== 'admin' && !isSuperAdmin($user) && !isSuperuser($user)) {
         jsonResp(['success' => false, 'error' => 'Only admins can list teachers'], 403);
     }

@@ -23,7 +23,8 @@ function students_list() {
         $sql = "
             SELECT s.id, s.student_id, s.user_id, s.gmail, s.assigned_mode as mode,
                    s.is_active, s.created_at, s.teacher_id, s.admin_id,
-                   u.username, t.username as teacherName
+                   u.username, t.username as teacherName,
+                   (SELECT device_fingerprint FROM Devices WHERE user_id = s.user_id ORDER BY last_seen DESC LIMIT 1) as deviceToken
             FROM Students s
             LEFT JOIN Users u ON s.user_id = u.id
             LEFT JOIN Users t ON s.teacher_id = t.id

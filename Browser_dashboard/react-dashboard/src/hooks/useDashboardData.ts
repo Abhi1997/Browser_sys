@@ -67,7 +67,7 @@ export function useStats() {
       }
       return response.data!;
     },
-    refetchInterval: 300000, // Refetch every 30 seconds
+    refetchInterval: 5000, // Refetch every 30 seconds
     retry: 2, // Retry failed requests twice
   });
 }
@@ -87,7 +87,7 @@ export function useUsers() {
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -107,7 +107,7 @@ export function useStudents() {
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -124,7 +124,7 @@ export function useActivity(studentId?: string, limit: number = 100) {
       }
       return response.data!;
     },
-    refetchInterval: 600000, // Refetch every 10 seconds for activity
+    refetchInterval: 5000, // Refetch every 10 seconds for activity
     retry: 2,
   });
 }
@@ -141,7 +141,7 @@ export function useViolations(studentId?: string, limit: number = 100) {
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -158,24 +158,24 @@ export function useChangeLogs(limit: number = 100) {
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
 
 // Dashboard logs query (who opened dashboard when - admin only)
-export function useSystemLogs(limit: number = 100) {
+export function useSystemLogs(limit: number = 100, role?: string) {
   return useQuery({
-    queryKey: ['systemLogs', limit],
+    queryKey: ['systemLogs', limit, role],
     queryFn: async () => {
-      const response = await getSystemLogs(limit);
+      const response = await getSystemLogs(limit, role);
       if (!response.success) {
         console.warn('Failed to fetch system logs:', response.error);
         return [];
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -192,7 +192,7 @@ export function useTopSites() {
       }
       return response.data!;
     },
-    refetchInterval: 600000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -209,7 +209,7 @@ export function useActiveUsers() {
       }
       return response.data!;
     },
-    refetchInterval: 600000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -226,7 +226,7 @@ export function useHistory(limit: number = 100) {
       }
       return response.data!;
     },
-    refetchInterval: 600000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -245,7 +245,7 @@ export function useStudentHistory(studentId: string | undefined, limit: number =
       return response.data!;
     },
     enabled: !!studentId,
-    refetchInterval: 600000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -262,7 +262,7 @@ export function useBookmarks() {
       }
       return response.data!;
     },
-    refetchInterval: 600000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -281,7 +281,7 @@ export function useStudentBookmarks(studentId: string | undefined) {
       return response.data!;
     },
     enabled: !!studentId,
-    refetchInterval: 600000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -298,7 +298,7 @@ export function useWarningTriggers(limit: number = 100, studentId?: string) {
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -315,7 +315,7 @@ export function useCachedSites() {
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -346,7 +346,7 @@ export function useSessions(limit: number = 100) {
       }
       return response.data!;
     },
-    refetchInterval: 600000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -363,7 +363,7 @@ export function useAdmins() {
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -380,7 +380,7 @@ export function useTeachers() {
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -550,7 +550,7 @@ export function useWhitelist() {
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }
@@ -655,7 +655,7 @@ export function useBlacklist() {
       }
       return response.data!;
     },
-    refetchInterval: 300000,
+    refetchInterval: 5000,
     retry: 2,
   });
 }

@@ -6,13 +6,10 @@ import { UserTable } from '@/components/admin/UserTable';
 import { StudentDetailCard } from '@/components/admin/StudentDetailCard';
 import { ListTable } from '@/components/admin/ListTable';
 import { CachedSitesTable } from '@/components/admin/CachedSitesTable';
-import { ChangeLogsTable } from '@/components/admin/ChangeLogsTable';
 import { DashboardLogsTable } from '@/components/admin/DashboardLogsTable';
-import { WarningTriggersTable } from '@/components/admin/WarningTriggersTable';
-import { SessionUsageTable } from '@/components/admin/SessionUsageTable';
 import { ExportButton } from '@/components/admin/ExportButton';
 import { TopVisitedChart } from '@/components/charts/TopVisitedChart';
-import { ActiveUsersChart } from '@/components/charts/ActiveUsersChart';
+import { RecentLoginsCard } from '@/components/charts/RecentLoginsCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -125,7 +122,7 @@ export default function SuperuserDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <TopVisitedChart />
-        <ActiveUsersChart />
+        <RecentLoginsCard />
       </div>
 
       {/* Tabs for all data management */}
@@ -151,15 +148,6 @@ export default function SuperuserDashboard() {
           </TabsTrigger>
           <TabsTrigger value="dashboard-logs" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">
             Dashboard logs
-          </TabsTrigger>
-          <TabsTrigger value="logs" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            Change logs
-          </TabsTrigger>
-          <TabsTrigger value="warnings" className="data-[state=active]:bg-warning data-[state=active]:text-warning-foreground">
-            Warnings
-          </TabsTrigger>
-          <TabsTrigger value="sessions" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            Sessions
           </TabsTrigger>
         </TabsList>
 
@@ -308,18 +296,6 @@ export default function SuperuserDashboard() {
 
         <TabsContent value="dashboard-logs" className="animate-fade-in">
           <DashboardLogsTable />
-        </TabsContent>
-
-        <TabsContent value="logs" className="animate-fade-in">
-          <ChangeLogsTable />
-        </TabsContent>
-
-        <TabsContent value="warnings" className="animate-fade-in">
-          <WarningTriggersTable />
-        </TabsContent>
-
-        <TabsContent value="sessions" className="animate-fade-in">
-          <SessionUsageTable />
         </TabsContent>
       </Tabs>
     </DashboardLayout>

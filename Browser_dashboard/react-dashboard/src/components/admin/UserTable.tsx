@@ -247,13 +247,15 @@ export function UserTable({ readOnly = false }: UserTableProps) {
               )}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => handleDelete(item.id)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
+            {!['admin', 'superadmin', 'superuser'].includes(item.role.toLowerCase()) && (
+              <DropdownMenuItem 
+                onClick={() => handleDelete(item.id)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -291,12 +293,6 @@ export function UserTable({ readOnly = false }: UserTableProps) {
               />
             </div>
           </div>
-          {!readOnly && (
-            <Button className="gap-2 whitespace-nowrap">
-              <UserIcon className="h-4 w-4" />
-              Add User
-            </Button>
-          )}
         </div>
       </div>
       <DataTable
