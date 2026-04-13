@@ -833,43 +833,52 @@ class GmailLoginWindow(QDialog):
 
     def handle_password_login(self):
         """Handle traditional username/password login"""
-        from PyQt6.QtWidgets import QMessageBox
-        
-        username = self.username_input.text().strip()
-        password = self.password_input.text().strip()
-        
-        if not username or not password:
-            QMessageBox.warning(self, "Login Failed", 
-                             "Please enter both username and password.")
+        # Prevent double-firing from Enter key + Button clicked
+        if getattr(self, "_is_logging_in", False):
             return
+        self._is_logging_in = True
         
-        result = self.auth.validate_user_with_id(username, password)
-        if result:
-            role, user_id = result
-            self.login_successful = True
-            self.user_role = role
-            self.username = username
-            self.user_id = user_id
+        try:
+            from PyQt6.QtWidgets import QMessageBox
             
-            # Register device
-            device_info = self.auth.get_device_info()
-            self.auth.register_device(user_id, device_info)
+            username = self.username_input.text().strip()
+            password = self.password_input.text().strip()
             
-            # Save persistent session to QSettings
-            from PyQt6.QtCore import QSettings
-            settings = QSettings("EduBrowser", "Settings")
-            settings.setValue("user_role", role)
-            settings.setValue("username", username)
-            settings.setValue("user_id", user_id)
-            settings.setValue("gmail", getattr(self, "gmail", None))
-            settings.setValue("device_fingerprint", device_info["device_fingerprint"])
-            import time
-            settings.setValue("login_timestamp", time.time())
+            if not username or not password:
+                QMessageBox.warning(self, "Login Failed", 
+                                 "Please enter both username and password.")
+                return
             
-            QMessageBox.information(self, "Login Successful", 
-                                  f"Welcome, {username}! Role: {role}")
-            self.accept()
-        else:
-            QMessageBox.warning(self, "Login Failed", 
-                              "Invalid username or password, or account not approved.")
+            result = self.auth.validate_user_with_id(username, password)
+            if result:
+                role, user_id = result
+                self.login_successful = True
+                self.user_role = role
+                self.username = username
+                self.user_id = user_id
+                
+                # Register device
+                device_info = self.auth.get_device_info()
+                self.auth.register_device(user_id, device_info)
+                
+                # Save persistent session to QSettings
+                from PyQt6.QtCore import QSettings
+                settings = QSettings("EduBrowser", "Settings")
+                settings.setValue("user_role", role)
+                settings.setValue("username", username)
+                settings.setValue("user_id", user_id)
+                settings.setValue("gmail", getattr(self, "gmail", None))
+                settings.setValue("device_fingerprint", device_info["device_fingerprint"])
+                import time
+                settings.setValue("login_timestamp", time.time())
+                
+                QMessageBox.information(self, "Login Successful", 
+                                      f"Welcome, {username}! Role: {role}")
+                self.accept()
+            else:
+                QMessageBox.warning(self, "Login Failed", 
+                                  "Invalid username or password, or account not approved.")
+        finally:
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(200, lambda: setattr(self, "_is_logging_in", False))
 

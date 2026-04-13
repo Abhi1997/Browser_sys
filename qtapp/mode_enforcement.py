@@ -87,7 +87,7 @@ class ModeEnforcement:
                 return True, f"Free mode - Safe Browsing check skipped: {e}"
         
         # Check blacklist first (most restrictive) - filter by student's admin_id
-        if self._is_blacklisted(domain, mode, student_id):
+        if self._is_blacklisted(url, domain, mode, student_id):
             if student_id:
                 self._log_violation(student_id, url, mode, "url_blocked", 
                                   f"URL blocked: {domain} is in blacklist")
@@ -105,16 +105,52 @@ class ModeEnforcement:
 
         # Check whitelist for study/restricted - filter by student's admin_id
         if mode in ("study", "restricted"):
-            if not self._is_whitelisted(domain, mode, student_id):
+            if not self._is_whitelisted(url, domain, mode, student_id):
                 if student_id:
                     self._log_violation(student_id, url, mode, "url_blocked",
                                       f"URL not whitelisted: {domain} not allowed in {mode} mode")
                 return False, f"Not allowed: {domain} is not whitelisted for {mode} mode"
         
         return True, "URL allowed"
-    
-    def _is_whitelisted(self, domain, mode, student_id=None):
-        """Check if domain is whitelisted for the mode (filtered by admin_id if student has one)"""
+    def _matches_rule(self, url_lower, domain_lower, rule):
+        rule = rule.strip()
+        if not rule:
+            return False
+            
+        if rule.startswith('http://'):
+            rule = rule[7:]
+        if rule.startswith('https://'):
+            rule = rule[8:]
+            
+        if '/' in rule:
+            rule_parts = rule.split('/', 1)
+            rule_domain = rule_parts[0]
+            rule_path = '/' + rule_parts[1]
+        else:
+            rule_domain = rule
+            rule_path = ""
+            
+        domain_match = False
+        if domain_lower == rule_domain or domain_lower.endswith('.' + rule_domain):
+            domain_match = True
+        elif rule_domain and rule_domain in domain_lower:
+            domain_match = True
+            
+        if domain_match:
+            if rule_path:
+                from urllib.parse import urlparse
+                try:
+                    parsed_path = urlparse(url_lower).path
+                    if parsed_path.startswith(rule_path):
+                        return True
+                except Exception:
+                    pass
+            else:
+                return True
+        return False
+
+    def _is_whitelisted(self, url, domain, mode, student_id=None):
+        """Check if domain or URL is whitelisted for the mode (filtered by admin_id if student has one)"""
         try:
             conn = self.auth._get_conn()
             cursor = conn.cursor()
@@ -143,8 +179,9 @@ class ModeEnforcement:
             conn.close()
             
             domain_lower = domain.lower()
+            url_lower = url.lower()
             for rule in rules:
-                if domain_lower == rule or domain_lower.endswith('.' + rule):
+                if self._matches_rule(url_lower, domain_lower, rule):
                     return True
             return False
         except Exception as e:
@@ -190,8 +227,8 @@ class ModeEnforcement:
             print(f"Error checking time window: {e}")
             return False
 
-    def _is_blacklisted(self, domain, mode, student_id=None):
-        """Check if domain is blacklisted for the mode (filtered by admin_id if student has one)"""
+    def _is_blacklisted(self, url, domain, mode, student_id=None):
+        """Check if domain or URL is blacklisted for the mode (filtered by admin_id if student has one)"""
         try:
             conn = self.auth._get_conn()
             cursor = conn.cursor()
@@ -220,8 +257,9 @@ class ModeEnforcement:
             conn.close()
 
             domain_lower = domain.lower()
+            url_lower = url.lower()
             for rule in rules:
-                if domain_lower == rule or domain_lower.endswith('.' + rule):
+                if self._matches_rule(url_lower, domain_lower, rule):
                     return True
             return False
         except Exception as e:

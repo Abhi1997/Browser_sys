@@ -9,7 +9,7 @@ import sys
 import os
 
 # Point dashboard at local dev server instead of production
-os.environ["DASHBOARD_URL"] = "http://localhost:8080"
+os.environ["DASHBOARD_URL"] = "http://abhinavpaudel.com"
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 

@@ -493,8 +493,37 @@ class MainWindow(QMainWindow):
         self.loading_screen = LoadingScreen(self, mode_name=mode_name, user_role=self.user_role)
         self.setCentralWidget(self.loading_screen)
         
+        # Student Fullscreen Enforcement
+        if self.user_role == "student":
+            if self.current_mode and self.current_mode != "free":
+                self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+            self.showFullScreen()
+            
+        # Global Application Focus Surveillance
+        app = QApplication.instance()
+        if app:
+            app.applicationStateChanged.connect(self.on_app_state_changed)
+            
         # Setup UI after delay (simulate loading)
         QTimer.singleShot(1500, self.finish_loading)
+
+    def on_app_state_changed(self, state):
+        if self.user_role == "student" and self.current_mode and self.current_mode != "free":
+            if state != Qt.ApplicationState.ApplicationActive:
+                self.trigger_exam_timeout("Application switched or minimized during restricted exam mode.")
+
+    def trigger_exam_timeout(self, reason):
+        if hasattr(self, '_exam_timing_out') and self._exam_timing_out:
+            return
+        self._exam_timing_out = True
+        
+        if hasattr(self, 'student_id') and self.student_id:
+            try:
+                self.mode_enforcer._log_violation(self.student_id, "background/app_switch", self.current_mode, "mode_bypass_attempt", reason)
+            except Exception:
+                pass
+                
+        self.logout(reason=f"SECURITY VIOLATION: {reason}")
 
     def finish_loading(self):
         """Complete loading and show browser UI"""
@@ -762,7 +791,7 @@ class MainWindow(QMainWindow):
         self.set_homepage_act.triggered.connect(self._set_homepage)
         settings_menu.addAction(self.set_homepage_act)
 
-    def logout(self):
+    def logout(self, reason=None):
         """Clear persistent session and restart the application."""
         from PyQt6.QtCore import QSettings
         from PyQt6.QtWidgets import QMessageBox
@@ -776,10 +805,13 @@ class MainWindow(QMainWindow):
         settings.remove("username")
         settings.remove("gmail")
         
+        msg = reason if reason else "You have been securely logged out. The application will now restart."
+        title = "Security Timeout" if reason else "Logged Out"
+        
         QMessageBox.information(
             self, 
-            "Logged Out", 
-            "You have been securely logged out. The application will now restart."
+            title, 
+            msg
         )
         
         # Safely detach and execute a fresh process instance
@@ -864,6 +896,11 @@ class MainWindow(QMainWindow):
             self.zoom_combo.setCurrentText(f"{pct}%")
 
     def _toggle_fullscreen(self):
+        if hasattr(self, 'user_role') and self.user_role == "student" and self.current_mode and self.current_mode != "free":
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Action Blocked", "You cannot exit fullscreen mode during a restricted exam session.")
+            return
+
         if self.isFullScreen():
             self.showNormal()
         else:
