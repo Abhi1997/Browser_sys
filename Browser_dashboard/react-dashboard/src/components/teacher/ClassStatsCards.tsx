@@ -15,7 +15,7 @@ export function ClassStatsCards() {
     }
 
     // Group students by mode (as a proxy for "class")
-    const modeGroups = ['cached', 'study', 'restricted', 'free'];
+    const modeGroups = ['cached', 'study', 'restricted', 'free', 'exam'];
     
     return modeGroups.map(mode => {
       const modeStudents = students.filter((s: any) => s.assignedMode === mode);

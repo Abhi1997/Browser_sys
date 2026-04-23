@@ -199,13 +199,19 @@ function getRequestedAdminId($user) {
 /**
  * Build WHERE clause for admin_id filtering.
  * Returns [clause, params] where clause is " AND admin_id = ?" or "" for superadmin.
+ * @param array $user JWT payload
+ * @param string $tableAlias Optional table alias prefix
+ * @param bool $includeGlobal If true, also include records where admin_id IS NULL
  */
-function adminIdFilter($user, $tableAlias = '') {
-    $adminId = getRequestedAdminId($user);
-    if ($adminId === null) {
+function adminIdFilter($user, $tableAlias = '', $includeGlobal = false) {
+    if (isSuperuser($user) || isSuperAdmin($user)) {
         return ['', []]; // Superadmin sees all
     }
+    $adminId = getRequestedAdminId($user);
     $col = $tableAlias ? "$tableAlias.admin_id" : "admin_id";
+    if ($includeGlobal && $adminId !== null) {
+        return [" AND ($col = ? OR $col IS NULL)", [$adminId]];
+    }
     return [" AND $col = ?", [$adminId]];
 }
 

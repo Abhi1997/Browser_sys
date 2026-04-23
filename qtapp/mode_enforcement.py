@@ -33,8 +33,27 @@ class ModeEnforcement:
             "color": "#10b981",  # Green
             "icon": "🌐",
             "description": "Unrestricted browsing (monitored)"
+        },
+        "exam": {
+            "name": "Exam Mode",
+            "color": "#ef4444",  # Red
+            "icon": "📝",
+            "description": "Strict exam environment - only a single site is allowed"
         }
     }
+    
+    # Common domains used for authentication/login that shouldn't be fully whitelisted
+    # but need to be reachable during an OAuth/SAML flow.
+    TRUSTED_AUTH_DOMAINS = [
+        "instructure.com",      # Canvas
+        "canvaslms.com",        # Canvas
+        "okta.com",             # SSO
+        "onelogin.com",         # SSO
+        "microsoftonline.com",  # Microsoft/Outlook SSO
+        "accounts.google.com",  # Google SSO
+        "shibboleth",           # Common academic SSO
+        "duosecurity.com",      # MFA
+    ]
     
     def __init__(self, auth: Authentication):
         self.auth = auth
@@ -103,9 +122,13 @@ class ModeEnforcement:
                 return False, "Only cached offline sites can be viewed in Cached mode. No network."
             return True, "Cached - load from offline"
 
-        # Check whitelist for study/restricted - filter by student's admin_id
-        if mode in ("study", "restricted"):
+        # Check whitelist for study/restricted/exam - filter by student's admin_id
+        if mode in ("study", "restricted", "exam"):
             if not self._is_whitelisted(url, domain, mode, student_id):
+                # Special case for Exam Mode: Allow login redirects if they point back to a whitelisted site
+                if mode == "exam" and self._is_auth_redirect(url, domain, mode, student_id):
+                    return True, "Allowed: Secure authentication flow redirect"
+                    
                 if student_id:
                     self._log_violation(student_id, url, mode, "url_blocked",
                                       f"URL not whitelisted: {domain} not allowed in {mode} mode")
@@ -131,9 +154,23 @@ class ModeEnforcement:
             rule_path = ""
             
         domain_match = False
-        if domain_lower == rule_domain or domain_lower.endswith('.' + rule_domain):
+        
+        # Handle wildcard rules like *.domain.com
+        if '*' in rule_domain:
+            # Convert wildcard rule to regex: *.instructure.com -> ^.*\.instructure\.com$
+            # and allow for the domain itself: instructure.com
+            import re
+            pattern = re.escape(rule_domain).replace('\\*', '.*')
+            if re.match(f"^{pattern}$", domain_lower):
+                domain_match = True
+            # Also check if it matches without the wildcard prefix (e.g. google.com matches *.google.com)
+            bare_rule = rule_domain.replace('*.', '').replace('*', '')
+            if domain_lower == bare_rule:
+                domain_match = True
+        elif domain_lower == rule_domain or domain_lower.endswith('.' + rule_domain):
             domain_match = True
         elif rule_domain and rule_domain in domain_lower:
+            # Fallback for partial matches (keep for backward compatibility)
             domain_match = True
             
         if domain_match:
@@ -147,6 +184,44 @@ class ModeEnforcement:
                     pass
             else:
                 return True
+        return False
+                
+    def _is_auth_redirect(self, url, domain, mode, student_id):
+        """
+        Detects if a non-whitelisted URL is part of a secure login flow.
+        Identifies auth providers and verifies they are redirecting back to a whitelisted exam site.
+        """
+        domain_lower = domain.lower()
+        
+        # 1. Is it a known auth provider?
+        is_trusted_provider = any(trusted in domain_lower for trusted in self.TRUSTED_AUTH_DOMAINS)
+        
+        # 2. Does it look like an auth path? (oauth, login, saml, etc.)
+        auth_patterns = ['/auth', '/login', '/saml', '/sso', '/authorize', '/callback']
+        url_lower = url.lower()
+        has_auth_path = any(pattern in url_lower for pattern in auth_patterns)
+        
+        if not (is_trusted_provider or has_auth_path):
+            return False
+            
+        # 3. CRITICAL: Does it point back to a whitelisted URL for this student?
+        from urllib.parse import parse_qs, urlparse
+        try:
+            parsed_params = parse_qs(urlparse(url).query)
+            # Common redirect parameters
+            redirect_keys = ['redirect_uri', 'target_domain', 'state', 'continue', 'return_to']
+            
+            for key in redirect_keys:
+                if key in parsed_params:
+                    for val in parsed_params[key]:
+                        # Check if the redirect target is whitelisted
+                        target_parsed = urlparse(val)
+                        target_domain = target_parsed.netloc.lower()
+                        if target_domain and self._is_whitelisted(val, target_domain, mode, student_id):
+                            return True
+        except Exception as e:
+            print(f"Error parsing auth redirect: {e}")
+            
         return False
 
     def _is_whitelisted(self, url, domain, mode, student_id=None):
@@ -166,7 +241,7 @@ class ModeEnforcement:
             if admin_id:
                 cursor.execute("""
                     SELECT domain FROM WhitelistDomains 
-                    WHERE mode=%s AND is_active=1 AND admin_id=%s
+                    WHERE mode=%s AND is_active=1 AND (admin_id=%s OR admin_id IS NULL)
                 """, (mode, admin_id))
             else:
                 cursor.execute("""
@@ -244,7 +319,7 @@ class ModeEnforcement:
             if admin_id:
                 cursor.execute("""
                     SELECT domain FROM BlacklistDomains 
-                    WHERE mode=%s AND is_active=1 AND admin_id=%s
+                    WHERE mode=%s AND is_active=1 AND (admin_id=%s OR admin_id IS NULL)
                 """, (mode, admin_id))
             else:
                 cursor.execute("""

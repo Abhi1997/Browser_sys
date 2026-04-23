@@ -1,5 +1,5 @@
 import React from 'react';
-import { User as UserIcon, MoreHorizontal, Folder, BookOpen, AlertCircle, Globe } from 'lucide-react';
+import { User as UserIcon, MoreHorizontal, Folder, BookOpen, AlertCircle, Globe, Bookmark } from 'lucide-react';
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +27,7 @@ const MODE_COLORS: Record<string, string> = {
   study: 'bg-primary/20 text-primary border-primary/30',
   restricted: 'bg-warning/20 text-warning border-warning/30',
   free: 'bg-success/20 text-success border-success/30',
+  exam: 'bg-destructive/20 text-destructive border-destructive/30',
 };
 
 const MODE_ICONS: Record<string, any> = {
@@ -34,6 +35,7 @@ const MODE_ICONS: Record<string, any> = {
   study: BookOpen,
   restricted: AlertCircle,
   free: Globe,
+  exam: Bookmark,
 };
 
 export function StudentTable() {
@@ -226,6 +228,7 @@ export function StudentTable() {
             <SelectItem value="study">Study</SelectItem>
             <SelectItem value="restricted">Restricted</SelectItem>
             <SelectItem value="free">Free</SelectItem>
+            <SelectItem value="exam">Exam</SelectItem>
           </SelectContent>
         </Select>
       ),

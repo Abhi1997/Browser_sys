@@ -20,6 +20,7 @@ const MODE_COLORS: Record<string, string> = {
   study: 'bg-primary/20 text-primary border-primary/30',
   restricted: 'bg-warning/20 text-warning border-warning/30',
   free: 'bg-success/20 text-success border-success/30',
+  exam: 'bg-destructive/20 text-destructive border-destructive/30',
 };
 
 const MODE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -27,6 +28,7 @@ const MODE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   study: BookOpen,
   restricted: AlertCircle,
   free: Globe,
+  exam: Bookmark, // Or some other icon like ClipboardList, but Bookmark is available
 };
 
 interface StudentDetailCardProps {
@@ -165,6 +167,7 @@ export function StudentDetailCard({ student }: StudentDetailCardProps) {
                 <SelectItem value="restricted">Restricted</SelectItem>
                 <SelectItem value="study">Study</SelectItem>
                 <SelectItem value="cached">Cached</SelectItem>
+                <SelectItem value="exam">Exam</SelectItem>
               </SelectContent>
             </Select>
           </div>

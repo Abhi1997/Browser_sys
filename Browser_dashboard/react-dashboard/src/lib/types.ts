@@ -36,6 +36,8 @@ export interface WhitelistEntry {
   addedBy: string;
   addedAt: string;
   isActive: boolean;
+  mode?: string;
+  admin_id?: string | null;
 }
 
 export interface BlacklistEntry {
@@ -45,6 +47,8 @@ export interface BlacklistEntry {
   addedBy: string;
   addedAt: string;
   isActive: boolean;
+  mode?: string;
+  admin_id?: string | null;
 }
 
 export interface StatsOverview {

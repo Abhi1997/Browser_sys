@@ -601,6 +601,34 @@ class Authentication:
             print(f"Error getting student mode: {e}")
             return "restricted"
     
+    def get_active_exam_site(self, student_id):
+        """Fetch the current active exam mode whitelist domain for this student (their admin or global)."""
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            
+            # 1. Get student's admin_id
+            cursor.execute("SELECT admin_id FROM Students WHERE student_id=%s OR user_id=%s", (student_id, student_id))
+            row = cursor.fetchone()
+            admin_id = row[0] if row else None
+            
+            # 2. Get active exam site (matching current admin or NULL/global)
+            if admin_id:
+                query = "SELECT domain FROM WhitelistDomains WHERE mode='exam' AND is_active=1 AND (admin_id=%s OR admin_id IS NULL) ORDER BY created_at DESC LIMIT 1"
+                cursor.execute(query, (admin_id,))
+            else:
+                query = "SELECT domain FROM WhitelistDomains WHERE mode='exam' AND is_active=1 ORDER BY created_at DESC LIMIT 1"
+                cursor.execute(query)
+                
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            return row[0] if row else None
+        except Exception as e:
+            print(f"Error getting active exam site: {e}")
+            return None
+    
     def set_student_mode(self, student_id, new_mode, changed_by):
         """Set student mode (admin/teacher only)"""
         if new_mode not in ("cached", "study", "restricted", "free"):

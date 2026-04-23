@@ -976,6 +976,15 @@ class MainWindow(QMainWindow):
                         self.current_view().setUrl(QUrl.fromLocalFile(full))
                         return
             self.current_view().setUrl(QUrl("about:blank"))
+        elif self.user_role == "student" and self.current_mode == "exam":
+            # Fetch active exam site for this student
+            exam_site = self.auth.get_active_exam_site(self.user_id)
+            if exam_site:
+                if not exam_site.startswith("http"):
+                    exam_site = "https://" + exam_site
+                self.current_view().setUrl(QUrl(exam_site))
+                return
+            self.current_view().setUrl(QUrl("about:blank"))
         else:
             default_hp = "https://www.google.com"
             import json

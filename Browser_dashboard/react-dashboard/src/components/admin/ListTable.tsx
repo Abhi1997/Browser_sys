@@ -65,6 +65,8 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newUrl, setNewUrl] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newMode, setNewMode] = useState('free');
+  const [editingItem, setEditingItem] = useState<WhitelistEntry | BlacklistEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchColumn, setSearchColumn] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -102,12 +104,15 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
           return desc.toLowerCase().includes(term);
         case 'addedBy':
           return i.addedBy?.toString().toLowerCase().includes(term);
+        case 'mode':
+          return i.mode?.toLowerCase().includes(term);
         case 'all':
         default:
           return (
             i.url.toLowerCase().includes(term) ||
             desc.toLowerCase().includes(term) ||
-            i.addedBy?.toString().toLowerCase().includes(term)
+            i.addedBy?.toString().toLowerCase().includes(term) ||
+            i.mode?.toLowerCase().includes(term)
           );
       }
     });
@@ -119,6 +124,8 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
         switch (sortConfig.key) {
           case 'url':
             valA = a.url.toLowerCase(); valB = b.url.toLowerCase(); break;
+          case 'mode':
+            valA = a.mode?.toLowerCase() || ''; valB = b.mode?.toLowerCase() || ''; break;
           case 'status':
             valA = a.isActive ? 1 : 0; valB = b.isActive ? 1 : 0; break;
           case 'addedBy':
@@ -165,7 +172,7 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
     const entry: any = {
       domain: newUrl.trim(),
       url: newUrl.trim(),
-      mode: 'free',
+      mode: newMode,
       addedBy: user?.id || '1',  // Use current user ID or default to admin
     };
     
@@ -179,7 +186,27 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
     
     setNewUrl('');
     setNewDescription('');
+    setNewMode('free');
     setIsAddDialogOpen(false);
+  };
+
+  const handleEdit = () => {
+    if (!editingItem || !editingItem.url.trim()) return;
+    
+    const updates: any = {
+      url: editingItem.url.trim(),
+      mode: editingItem.mode,
+    };
+    
+    if (isWhitelist) {
+      updates.description = (editingItem as WhitelistEntry).description?.trim();
+      updateWhitelistEntry.mutate({ id: editingItem.id, updates });
+    } else {
+      updates.reason = (editingItem as BlacklistEntry).reason?.trim();
+      updateBlacklistEntry.mutate({ id: editingItem.id, updates });
+    }
+    
+    setEditingItem(null);
   };
 
   if (isLoading) {
@@ -217,6 +244,19 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
             </p>
           </div>
         </div>
+      ),
+    },
+    {
+      key: 'mode',
+      header: (
+        <Button variant="ghost" onClick={() => handleSort('mode')} className="-ml-4 hover:bg-transparent text-muted-foreground font-semibold">
+          Mode <SortIcon columnKey="mode" />
+        </Button>
+      ),
+      render: (item: any) => (
+        <Badge variant="outline" className="capitalize">
+          {item.mode || 'free'}
+        </Badge>
       ),
     },
     {
@@ -265,42 +305,54 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
     ...(readOnly ? [] : [{
       key: 'actions',
       header: '',
-      render: (item: WhitelistEntry | BlacklistEntry) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleToggleStatus(item.id)}>
-              {item.isActive ? (
-                <>
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Disable
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Enable
-                </>
-              )}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => handleDelete(item.id)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Remove
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+      render: (item: WhitelistEntry | BlacklistEntry) => {
+        const isGlobal = !item.admin_id;
+        const canManage = user?.role === 'superuser' || user?.role === 'super-admin' || !isGlobal;
+        
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={() => setEditingItem(item)}
+                disabled={!canManage}
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => handleToggleStatus(item.id)}
+                disabled={!canManage}
+              >
+                {item.isActive ? (
+                  <>
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Disable
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Enable
+                  </>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => handleDelete(item.id)}
+                className="text-destructive focus:text-destructive"
+                disabled={!canManage}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     }]),
   ];
 
@@ -326,6 +378,7 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
                   <SelectItem value="url">URL</SelectItem>
                   <SelectItem value="description">Description</SelectItem>
                   <SelectItem value="addedBy">Added By</SelectItem>
+                  <SelectItem value="mode">Mode</SelectItem>
                 </SelectContent>
               </Select>
               <div className="relative w-full sm:w-56 group-hover:border-primary/50 transition-colors">
@@ -338,6 +391,12 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
                 />
               </div>
             </div>
+            {isWhitelist && (
+              <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-full text-[11px] text-blue-700 dark:text-blue-300 animate-in fade-in slide-in-from-top-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                Login redirects for Canvas, Google, and Microsoft are supported automatically.
+              </div>
+            )}
             {!readOnly && (
               <Button 
                 onClick={() => setIsAddDialogOpen(true)}
@@ -406,6 +465,20 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
                 onChange={(e) => setNewDescription(e.target.value)}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="mode">Target Mode</Label>
+              <Select value={newMode} onValueChange={setNewMode}>
+                <SelectTrigger id="mode">
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="exam">Exam</SelectItem>
+                  <SelectItem value="study">Study</SelectItem>
+                  <SelectItem value="restricted">Restricted</SelectItem>
+                  <SelectItem value="free">Free</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
@@ -417,6 +490,64 @@ export function ListTable({ type, readOnly = false }: ListTableProps) {
                 : ""
             }>
               Add to {type}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit {isWhitelist ? 'Whitelist' : 'Blacklist'} Entry</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-url">URL</Label>
+              <Input
+                id="edit-url"
+                value={editingItem?.url || ''}
+                onChange={(e) => setEditingItem(prev => prev ? { ...prev, url: e.target.value } : null)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">
+                {isWhitelist ? 'Description' : 'Reason'}
+              </Label>
+              <Input
+                id="edit-description"
+                value={isWhitelist ? (editingItem as WhitelistEntry)?.description : (editingItem as BlacklistEntry)?.reason || ''}
+                onChange={(e) => setEditingItem(prev => {
+                  if (!prev) return null;
+                  const val = e.target.value;
+                  return isWhitelist 
+                    ? { ...prev, description: val } as WhitelistEntry
+                    : { ...prev, reason: val } as BlacklistEntry;
+                })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-mode">Target Mode</Label>
+              <Select 
+                value={editingItem?.mode || 'free'} 
+                onValueChange={(value) => setEditingItem(prev => prev ? { ...prev, mode: value } : null)}
+              >
+                <SelectTrigger id="edit-mode">
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="exam">Exam</SelectItem>
+                  <SelectItem value="study">Study</SelectItem>
+                  <SelectItem value="restricted">Restricted</SelectItem>
+                  <SelectItem value="free">Free</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingItem(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEdit} className={isWhitelist ? "bg-success hover:bg-success/90 text-success-foreground" : ""}>
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
