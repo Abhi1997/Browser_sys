@@ -1,4 +1,4 @@
-# EduBrowser Core System
+# DCES Core System
 
 A secure, centralized, and role-based custom browsing environment designed specifically for educational and localized administration use. The application enforces website restrictions, captures browsing analytics, and offers unified management tools for students, teachers, administrators, and super-administrators.
 
@@ -48,7 +48,7 @@ Browser_sys/
 
 ## Running The Project
 
-### Option A: Running the Python Desktop Application (EduBrowser)
+### Option A: Running the Python Desktop Application (DCES)
 
 **Prerequisites:** Python 3.10+, pip
 1. Navigate to the `qtapp` directory:
